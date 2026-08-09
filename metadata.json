@@ -1,0 +1,6 @@
+{
+  "name": "FogueteData Aerospace",
+  "description": "Plataforma brasileira de foguetemodelismo, cálculo de trajetórias, telemetria em tempo real, simulação 3D, manual BAR-AEB e gestão de equipes de minifoguetes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
