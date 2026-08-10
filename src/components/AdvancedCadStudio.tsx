@@ -255,7 +255,7 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-5 font-sans">
-      <div className="bg-[#0B0F19] border border-red-500/40 rounded-2xl max-w-6xl w-full h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden relative">
+      <div className="bg-black border border-red-500/40 rounded-2xl max-w-6xl w-full h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden relative">
         
         {/* Studio Toast */}
         {studioToast && (
@@ -505,7 +505,7 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
                   </div>
 
                   {/* Realtime Dimension Overlays */}
-                  <div className="absolute top-3 left-4 flex items-center gap-3 text-[11px] font-mono bg-[#0B0F19]/90 border border-slate-800 p-2 rounded-lg">
+                  <div className="absolute top-3 left-4 flex items-center gap-3 text-[11px] font-mono bg-black/90 border border-slate-800 p-2 rounded-lg">
                     <span className="text-red-400 font-bold">
                       Cota L: {lengthMm.toFixed(1)} mm
                     </span>
@@ -518,7 +518,7 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
                   </div>
 
                   {/* Center Points */}
-                  <div className="absolute bottom-3 right-4 flex items-center gap-3 text-[11px] font-mono bg-[#0B0F19]/90 border border-slate-800 p-2 rounded-lg">
+                  <div className="absolute bottom-3 right-4 flex items-center gap-3 text-[11px] font-mono bg-black/90 border border-slate-800 p-2 rounded-lg">
                     <span className="text-emerald-400 font-bold">
                       CG: {cgLocationCm} cm
                     </span>

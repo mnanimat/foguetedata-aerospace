@@ -25,7 +25,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-slate-300 flex flex-col font-sans selection:bg-red-600 selection:text-white transition-colors duration-200 relative overflow-x-hidden">
+      <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-slate-300 flex flex-col font-sans selection:bg-red-600 selection:text-white transition-colors duration-200 relative overflow-x-hidden">
         
         {/* Top Main Navbar with embedded header controls */}
         <Navbar

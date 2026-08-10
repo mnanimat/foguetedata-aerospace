@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-[#05070A] dark:bg-[#05070A] light:bg-white border-b border-slate-800 dark:border-slate-800 light:border-slate-200 text-slate-100 dark:text-white light:text-slate-900 shadow-xl transition-colors">
       {/* Top Banner - Direct Links to MNAnimat Services */}
-      <div className="bg-[#0B0F19] dark:bg-[#0B0F19] light:bg-slate-100 px-4 py-1 text-[11px] border-b border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 flex flex-wrap justify-between items-center gap-2">
+      <div className="bg-black dark:bg-black light:bg-slate-100 px-4 py-1 text-[11px] border-b border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 flex flex-wrap justify-between items-center gap-2">
         <div className="flex items-center gap-2 text-slate-400 dark:text-slate-400 light:text-slate-600 font-mono">
           <span className="inline-flex items-center gap-1 font-semibold text-blue-400 dark:text-blue-400 light:text-blue-700 bg-blue-900/30 dark:bg-blue-900/30 light:bg-blue-100 px-2 py-0.5 rounded text-[10px] border border-blue-800/50 light:border-blue-300">
             <Sparkles className="w-3 h-3 text-amber-400" />

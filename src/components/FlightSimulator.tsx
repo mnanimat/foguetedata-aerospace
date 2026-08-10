@@ -873,7 +873,7 @@ export const FlightSimulator: React.FC = () => {
       {/* Expanded Trajectory Fullscreen Modal */}
       {isTrajectoryExpanded && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 font-mono text-xs">
-          <div className="bg-[#0B0F19] border border-red-500/50 rounded-2xl max-w-6xl w-full h-[92vh] flex flex-col shadow-2xl overflow-hidden relative text-slate-100">
+          <div className="bg-black border border-red-500/50 rounded-2xl max-w-6xl w-full h-[92vh] flex flex-col shadow-2xl overflow-hidden relative text-slate-100">
             
             {/* Modal Header */}
             <div className="bg-[#111827] border-b border-slate-800 p-4 flex items-center justify-between">
