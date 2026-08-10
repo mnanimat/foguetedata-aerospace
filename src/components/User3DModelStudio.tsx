@@ -299,6 +299,46 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   const [hudConstraint, setHudConstraint] = useState<'coincident' | 'parallel'>('coincident');
   const [hudKeyLight, setHudKeyLight] = useState<number>(2.5);
 
+  const [sketchLines, setSketchLines] = useState<number[][][]>([]);
+  const [sketchStartPoint, setSketchStartPoint] = useState<{x: number, y: number, z: number} | null>(null);
+  const [sketchMeasure, setSketchMeasure] = useState<string>('');
+  const [sketchAngle, setSketchAngle] = useState<string>('');
+
+  const calcularPontoFinal = () => {
+    if (!sketchStartPoint) {
+      setToastMessage("Selecione um ponto inicial clicando na grade primeiro!");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    const angulo = parseFloat(sketchAngle);
+    const distancia = parseFloat(sketchMeasure);
+
+    if (isNaN(angulo) || isNaN(distancia)) {
+      setToastMessage("Medida e Ângulo devem ser números válidos!");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    const radianos = (angulo * Math.PI) / 180;
+    
+    // Supondo vista 'top', desenhamos no plano XZ
+    const x2 = sketchStartPoint.x + distancia * Math.cos(radianos);
+    const z2 = sketchStartPoint.z + distancia * Math.sin(radianos); 
+
+    const novaLinha = [
+      [sketchStartPoint.x, sketchStartPoint.y, sketchStartPoint.z],
+      [x2, sketchStartPoint.y, z2]
+    ];
+
+    setSketchLines([...sketchLines, novaLinha]);
+    setSketchStartPoint({ x: x2, y: sketchStartPoint.y, z: z2 }); // Reseta para a próxima linha de forma continua
+    setSketchMeasure('');
+    setSketchAngle('');
+    setToastMessage(`⚡ Linha desenhada com sucesso!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const handleViewportExportPDF = () => {
     const specs = {
       lengthMm: hudLengthMm,
@@ -354,20 +394,20 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   const renderInViewportCadHud = () => (
     <>
       {/* Top Banner Over 3D Canvas */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-700/80 px-3 py-1 rounded-full text-[10px] font-mono flex items-center gap-2 sm:gap-3 text-slate-200 shadow-xl">
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-white/85 dark:bg-slate-950/85 backdrop-blur-md border border-slate-300 dark:border-slate-700/80 px-3 py-1 rounded-full text-[10px] font-mono flex items-center gap-2 sm:gap-3 text-slate-800 dark:text-slate-200 shadow-xl">
         <span className="flex items-center gap-1 text-red-400 font-bold">
           <SlidersHorizontal className="w-3 h-3" /> CAD HUD:
         </span>
-        <span>$L$: <strong className="text-white">{hudLengthMm}mm</strong></span>
-        <span>$\varnothing$: <strong className="text-white">{hudDiameterMm}mm</strong></span>
-        <span>$t$: <strong className="text-white">{hudWallThicknessMm}mm</strong></span>
+        <span>$L$: <strong className="text-slate-900 dark:text-white">{hudLengthMm}mm</strong></span>
+        <span>$\varnothing$: <strong className="text-slate-900 dark:text-white">{hudDiameterMm}mm</strong></span>
+        <span>$t$: <strong className="text-slate-900 dark:text-white">{hudWallThicknessMm}mm</strong></span>
         <span className="hidden sm:inline text-amber-400 font-bold uppercase">{hudTubeType}</span>
       </div>
 
       {/* Floating Panel (when a tab is selected) */}
       {activeViewportCadTab !== 'none' && (
-        <div className="absolute bottom-14 inset-x-2 sm:inset-x-4 z-30 bg-black/95 backdrop-blur-xl border border-red-500/50 rounded-xl p-3 shadow-2xl text-xs font-mono text-slate-100 max-h-56 overflow-y-auto animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+        <div className="absolute bottom-14 inset-x-2 sm:inset-x-4 z-30 bg-white/95 dark:bg-black/95 backdrop-blur-xl border border-red-500/50 rounded-xl p-3 shadow-2xl text-xs font-mono text-slate-100 max-h-56 overflow-y-auto animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-2 mb-2">
             <span className="font-bold text-red-400 uppercase flex items-center gap-1.5">
               {activeViewportCadTab === 'measures' && <><Sliders className="w-4 h-4 text-red-500" /> Medidas Exatas & Perfis CAD</>}
               {activeViewportCadTab === 'sketch' && <><Edit3 className="w-4 h-4 text-amber-400" /> Esboço 2D/3D & Restrições Geométricas</>}
@@ -376,7 +416,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             </span>
             <button
               onClick={() => setActiveViewportCadTab('none')}
-              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+              className="p-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -386,7 +426,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           {activeViewportCadTab === 'measures' && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-slate-400 mb-1">Comprimento ($L$): <strong className="text-red-400">{hudLengthMm} mm</strong></label>
+                <label className="block text-slate-500 dark:text-slate-400 mb-1">Comprimento ($L$): <strong className="text-red-400">{hudLengthMm} mm</strong></label>
                 <input
                   type="range"
                   min="300"
@@ -398,7 +438,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1">Diâmetro ($\varnothing$): <strong className="text-red-400">{hudDiameterMm} mm</strong></label>
+                <label className="block text-slate-500 dark:text-slate-400 mb-1">Diâmetro ($\varnothing$): <strong className="text-red-400">{hudDiameterMm} mm</strong></label>
                 <input
                   type="range"
                   min="20"
@@ -410,7 +450,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1">Espessura ($t$): <strong className="text-red-400">{hudWallThicknessMm} mm</strong></label>
+                <label className="block text-slate-500 dark:text-slate-400 mb-1">Espessura ($t$): <strong className="text-red-400">{hudWallThicknessMm} mm</strong></label>
                 <input
                   type="range"
                   min="0.8"
@@ -422,11 +462,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-slate-400 mb-1">Perfil de Tubos / Modificador Frame:</label>
+                <label className="block text-slate-500 dark:text-slate-400 mb-1">Perfil de Tubos / Modificador Frame:</label>
                 <select
                   value={hudTubeType}
                   onChange={(e) => setHudTubeType(e.target.value as any)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 text-slate-900 dark:text-white"
                 >
                   <option value="cylinder">Tubo Cilíndrico Redondo (Ø {hudDiameterMm}mm)</option>
                   <option value="square">Tubo Quadrado Estrutural ({hudDiameterMm}x{hudDiameterMm}mm)</option>
@@ -436,14 +476,14 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-slate-400 mb-1">Padrão Circular (Circular Pattern):</label>
+                <label className="block text-slate-500 dark:text-slate-400 mb-1">Padrão Circular (Circular Pattern):</label>
                 <input
                   type="number"
                   min="2"
                   max="12"
                   value={hudPatternCount}
                   onChange={(e) => setHudPatternCount(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-white font-mono"
+                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 text-slate-900 dark:text-white font-mono"
                 />
               </div>
             </div>
@@ -453,21 +493,66 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           {activeViewportCadTab === 'sketch' && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-400">Ferramenta:</span>
+                <span className="text-slate-500 dark:text-slate-400">Ferramenta:</span>
                 {(['line', 'circle', 'arc', 'rectangle'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setHudSketchTool(t)}
-                    className={`px-2 py-1 rounded border capitalize ${hudSketchTool === t ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-900 text-slate-300 border-slate-800'}`}
+                    className={`px-2 py-1 rounded border capitalize ${hudSketchTool === t ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800'}`}
                   >
                     {t}
                   </button>
                 ))}
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800">
+              
+              {hudSketchTool === 'line' && (
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-300 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 text-[11px]">Medida (mm):</span>
+                    <input
+                      type="number"
+                      value={sketchMeasure}
+                      onChange={(e) => setSketchMeasure(e.target.value)}
+                      placeholder="Ex: 100"
+                      className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white px-2 py-1 rounded w-20 text-[11px] outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 text-[11px]">Ângulo (°):</span>
+                    <input
+                      type="number"
+                      value={sketchAngle}
+                      onChange={(e) => setSketchAngle(e.target.value)}
+                      placeholder="Ex: 45"
+                      className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white px-2 py-1 rounded w-20 text-[11px] outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <button
+                    onClick={calcularPontoFinal}
+                    className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded font-bold text-[11px] flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Desenhar Linha
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSketchLines([]);
+                      setSketchStartPoint(null);
+                      setToastMessage("Esboço limpo!");
+                      setTimeout(() => setToastMessage(null), 3000);
+                    }}
+                    className="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded font-bold text-[11px] flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Limpar
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-300 dark:border-slate-800">
                 <button
                   onClick={() => setHudConstraint(hudConstraint === 'coincident' ? 'parallel' : 'coincident')}
-                  className="bg-slate-900 border border-slate-700 text-amber-300 px-2 py-1 rounded flex items-center gap-1"
+                  className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-amber-300 px-2 py-1 rounded flex items-center gap-1"
                 >
                   {hudConstraint === 'coincident' ? <Crosshair className="w-3 h-3" /> : <Repeat className="w-3 h-3" />}
                   Restrição {hudConstraint.toUpperCase()}
@@ -479,7 +564,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                   }}
                   className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded font-bold"
                 >
-                  Extrudar para Sólido 3D ({hudExtrudeDepth}mm)
+                  Extrudar para Sólido ({hudExtrudeDepth}mm)
                 </button>
               </div>
             </div>
@@ -489,7 +574,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           {activeViewportCadTab === 'lighting' && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <label className="block text-slate-400">Key Light: {hudKeyLight}x</label>
+                <label className="block text-slate-500 dark:text-slate-400">Key Light: {hudKeyLight}x</label>
                 <input
                   type="range"
                   min="0.5"
@@ -505,7 +590,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                   setToastMessage('📸 Snapshot Raymarching 4K capturado com Oclusão!');
                   setTimeout(() => setToastMessage(null), 3000);
                 }}
-                className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1.5"
+                className="bg-yellow-600 hover:bg-yellow-500 text-slate-900 dark:text-white font-bold px-3 py-1.5 rounded flex items-center gap-1.5"
               >
                 <Camera className="w-4 h-4" /> Capturar Foto 4K HQ
               </button>
@@ -517,19 +602,19 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 onClick={handleViewportExportPDF}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
+                className="bg-emerald-700 hover:bg-emerald-600 text-slate-900 dark:text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
               >
                 <FileText className="w-3.5 h-3.5" /> PDF A3 (ABNT)
               </button>
               <button
                 onClick={() => handleViewportExport3D('stl')}
-                className="bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
+                className="bg-cyan-700 hover:bg-cyan-600 text-slate-900 dark:text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
               >
                 <Box className="w-3.5 h-3.5" /> .STL (Impressão)
               </button>
               <button
                 onClick={() => handleViewportExport3D('obj')}
-                className="bg-purple-700 hover:bg-purple-600 text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
+                className="bg-purple-700 hover:bg-purple-600 text-slate-900 dark:text-white font-bold py-1.5 rounded flex items-center justify-center gap-1 text-[11px]"
               >
                 <Disc className="w-3.5 h-3.5" /> .OBJ (Malha 3D)
               </button>
@@ -545,13 +630,13 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       )}
 
       {/* Floating Bottom In-Canvas CAD Toolbar (Anchored inside 3D Canvas) */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-slate-950/90 backdrop-blur-md border border-slate-700/80 p-1.5 rounded-2xl shadow-2xl flex items-center gap-1 text-xs font-mono max-w-[95%] overflow-x-auto">
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border border-slate-300 dark:border-slate-700/80 p-1.5 rounded-2xl shadow-2xl flex items-center gap-1 text-xs font-mono max-w-[95%] overflow-x-auto">
         <button
           onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'measures' ? 'none' : 'measures')}
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'measures'
               ? 'bg-red-600 text-white border border-red-400'
-              : 'bg-slate-900/90 text-slate-300 hover:text-white border border-slate-800'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
           }`}
           title="Abrir Painel de Medidas Exatas e Perfis CAD"
         >
@@ -564,7 +649,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'sketch'
               ? 'bg-amber-600 text-white border border-amber-400'
-              : 'bg-slate-900/90 text-slate-300 hover:text-white border border-slate-800'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
           }`}
           title="Abrir Ferramentas de Esboço 2D/3D e Restrições"
         >
@@ -576,8 +661,8 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'lighting' ? 'none' : 'lighting')}
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'lighting'
-              ? 'bg-yellow-600 text-white border border-yellow-400'
-              : 'bg-slate-900/90 text-slate-300 hover:text-white border border-slate-800'
+              ? 'bg-yellow-600 text-slate-900 dark:text-white border border-yellow-400'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
           }`}
           title="Controle de Iluminação de Estúdio e Render HQ"
         >
@@ -589,8 +674,8 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'export' ? 'none' : 'export')}
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'export'
-              ? 'bg-emerald-600 text-white border border-emerald-400'
-              : 'bg-slate-900/90 text-slate-300 hover:text-white border border-slate-800'
+              ? 'bg-emerald-600 text-slate-900 dark:text-white border border-emerald-400'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
           }`}
           title="Exportar Desenho PDF A3, STL e Usinagem CNC"
         >
@@ -1125,6 +1210,25 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
     scene.add(transformControl.getHelper());
     transformControlRef.current = transformControl;
 
+    // Render Sketch Lines
+    sketchLines.forEach(linePoints => {
+      const material = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+      const points = [];
+      points.push(new THREE.Vector3(linePoints[0][0], linePoints[0][1], linePoints[0][2]));
+      points.push(new THREE.Vector3(linePoints[1][0], linePoints[1][1], linePoints[1][2]));
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, material);
+      objectsGroup.add(line);
+    });
+
+    if (sketchStartPoint) {
+      const geom = new THREE.SphereGeometry(0.2, 16, 16);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const sphere = new THREE.Mesh(geom, mat);
+      sphere.position.set(sketchStartPoint.x, sketchStartPoint.y, sketchStartPoint.z);
+      objectsGroup.add(sphere);
+    }
+
     let activeSelectedGroup: THREE.Object3D | null = null;
 
     // Build & render all visible objects in models
@@ -1137,6 +1241,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       meshObj.position.set(m.posX, m.posY, m.posZ);
       meshObj.rotation.set(m.rotX, m.rotY, m.rotZ);
       meshObj.scale.set(m.scaleX, m.scaleY, m.scaleZ);
+      
+      meshObj.userData = { id: m.id };
+      meshObj.traverse((child) => {
+        child.userData = { id: m.id };
+      });
 
       objectsGroup.add(meshObj);
 
@@ -1181,6 +1290,74 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       }
     });
 
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const onPointerDown = (event: PointerEvent) => {
+      // Se clicou no painel de ferramentas HUD ou em outro botão, ignora
+      if ((event.target as HTMLElement).closest('button')) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      // Se estiver no modo Sketch, a gente pega a coordenada do Grid no Z=0
+      if (activeViewportCadTab === 'sketch' && hudSketchTool === 'line') {
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 2); // plano Y=-2 (posição do grid)
+        const target = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, target);
+        if (target) {
+          // Fixando em Z=0 no grid
+          if (!sketchStartPoint) {
+            setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
+            setToastMessage(`Ponto Inicial: (${target.x.toFixed(1)}, ${target.z.toFixed(1)}). Selecione o final ou digite medida/ângulo.`);
+            setTimeout(() => setToastMessage(null), 3000);
+          } else {
+            // Desenha linha até o alvo e o alvo vira o novo ponto inicial
+            const novaLinha = [
+              [sketchStartPoint.x, sketchStartPoint.y, sketchStartPoint.z],
+              [target.x, target.y, target.z]
+            ];
+            setSketchLines(prev => [...prev, novaLinha]);
+            setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
+            
+            // Atualiza inputs com a medida e angulo reais
+            const dx = target.x - sketchStartPoint.x;
+            const dz = target.z - sketchStartPoint.z;
+            const dist = Math.sqrt(dx*dx + dz*dz).toFixed(1);
+            let ang = (Math.atan2(dz, dx) * 180 / Math.PI).toFixed(1);
+            if (parseFloat(ang) < 0) ang = (360 + parseFloat(ang)).toFixed(1);
+            
+            setSketchMeasure(dist);
+            setSketchAngle(ang);
+            
+            setToastMessage(`Linha Desenhada. Novo Ponto Inicial: (${target.x.toFixed(1)}, ${target.z.toFixed(1)}).`);
+            setTimeout(() => setToastMessage(null), 3000);
+          }
+        }
+        return;
+      }
+
+      // Ignora se estiver arrastando o TransformControls
+      if (isDraggingRef.current) return;
+      
+      const intersects = raycaster.intersectObjects(objectsGroup.children, true);
+      
+      if (intersects.length > 0) {
+        // Encontra o objeto com ID mais próximo
+        const hit = intersects.find(i => i.object.userData?.id);
+        if (hit && hit.object.userData?.id) {
+          setSelectedModelId(hit.object.userData.id);
+        }
+      } else {
+        // Clicou no fundo
+        setSelectedModelId(null);
+      }
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -1190,13 +1367,14 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
     animate();
 
     return () => {
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       cancelAnimationFrame(animId);
       transformControl.detach();
       transformControl.dispose();
       orbitControls.dispose();
       renderer.dispose();
     };
-  }, [models, selectedModelId, isExpanded, activeGizmoTool, pushHistory]);
+  }, [models, selectedModelId, isExpanded, activeGizmoTool, pushHistory, sketchLines, sketchStartPoint, activeViewportCadTab]);
 
   // Handle Transform Slider Change
   const handleTransformChange = (field: keyof User3DModel, val: number) => {
@@ -1279,23 +1457,23 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 right-6 z-50 bg-red-600 text-white font-mono text-xs px-4 py-2.5 rounded-lg shadow-2xl border border-red-300 flex items-center gap-2 animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-slate-900 dark:text-white shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Header Banner */}
-      <div className="bg-[#111827] border border-slate-800 rounded-lg p-5 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 rounded-lg p-5 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 text-red-500 font-mono text-[10px] uppercase tracking-wider mb-1">
             <Box className="w-3.5 h-3.5" />
             Engenharia CAD 3D & Modelagem em Tempo Real
           </div>
-          <h2 className="text-xl font-bold font-italic-title text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-xl font-bold font-italic-title text-slate-900 dark:text-slate-900 dark:text-white tracking-tight">
             Estúdio Interativo de Objetos 3D & Importador CAD (.STL, .OBJ, .FBX)
           </h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-3xl leading-relaxed">
-            Adicione <strong className="text-red-400">formas geométricas básicas</strong> e <strong className="text-red-400">componentes de foguete</strong> (aleta, nariz, motor, tubo de corpo). Gerencie visibilidade (👁️), bloqueio (🔒) e exclusão por botão ou atalho (<strong className="text-white">Delete / Backspace</strong>). Importe arquivos <strong className="text-white">.STL, .OBJ e .FBX</strong> instantaneamente.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-3xl leading-relaxed">
+            Adicione <strong className="text-red-400">formas geométricas básicas</strong> e <strong className="text-red-400">componentes de foguete</strong> (aleta, nariz, motor, tubo de corpo). Gerencie visibilidade (👁️), bloqueio (🔒) e exclusão por botão ou atalho (<strong className="text-slate-900 dark:text-white">Delete / Backspace</strong>). Importe arquivos <strong className="text-slate-900 dark:text-white">.STL, .OBJ e .FBX</strong> instantaneamente.
           </p>
         </div>
 
@@ -1316,7 +1494,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           {currentUser ? (
             <button
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-lg text-xs font-bold transition font-mono"
+              className="inline-flex items-center gap-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 px-3.5 py-2 rounded-lg text-xs font-bold transition font-mono"
             >
               <Plus className="w-4 h-4 text-red-400" />
               Adicionar Modelo Procedural
@@ -1334,26 +1512,26 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       </div>
 
       {/* QUICK TOOLBAR: INSERT GEOMETRIC PRIMITIVES & ROCKET COMPONENTS */}
-      <div className="bg-[#111827] border border-slate-800 rounded-lg p-4 shadow-xl space-y-3">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800 pb-2">
-          <h3 className="text-xs font-bold text-white uppercase font-mono tracking-wider flex items-center gap-2">
+      <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 rounded-lg p-4 shadow-xl space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-300 dark:border-slate-800 pb-2">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase font-mono tracking-wider flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-red-500" />
             Inserção Rápida de Formas Geométricas & Componentes de Foguete
           </h3>
-          <span className="text-[10px] text-slate-400 font-mono">Clique para adicionar diretamente na cena 3D</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Clique para adicionar diretamente na cena 3D</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Basic Geometric Primitives */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-mono font-semibold text-slate-300 flex items-center gap-1.5">
+            <span className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Box className="w-3.5 h-3.5 text-blue-400" />
               Formas Geométricas Básicas:
             </span>
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => handleAddPrimitive('cube')}
-                className="bg-slate-900 hover:bg-blue-600/30 border border-slate-700 hover:border-blue-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-blue-600/30 border border-slate-300 dark:border-slate-700 hover:border-blue-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Cubo 3D"
               >
                 <Box className="w-3.5 h-3.5 text-blue-400" />
@@ -1361,7 +1539,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddPrimitive('arc')}
-                className="bg-slate-900 hover:bg-purple-600/30 border border-slate-700 hover:border-purple-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-purple-600/30 border border-slate-300 dark:border-slate-700 hover:border-purple-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Arco / Toro 3D"
               >
                 <Disc className="w-3.5 h-3.5 text-purple-400" />
@@ -1369,7 +1547,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddPrimitive('cone')}
-                className="bg-slate-900 hover:bg-amber-600/30 border border-slate-700 hover:border-amber-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-amber-600/30 border border-slate-300 dark:border-slate-700 hover:border-amber-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Cone Geométrico"
               >
                 <Triangle className="w-3.5 h-3.5 text-amber-400 rotate-180" />
@@ -1377,7 +1555,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddPrimitive('pyramid')}
-                className="bg-slate-900 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-emerald-600/30 border border-slate-300 dark:border-slate-700 hover:border-emerald-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Pirâmide 3D"
               >
                 <Triangle className="w-3.5 h-3.5 text-emerald-400" />
@@ -1385,7 +1563,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddPrimitive('cylinder')}
-                className="bg-slate-900 hover:bg-red-600/30 border border-slate-700 hover:border-red-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-red-600/30 border border-slate-300 dark:border-slate-700 hover:border-red-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Cilindro Base"
               >
                 <Cylinder className="w-3.5 h-3.5 text-red-400" />
@@ -1393,7 +1571,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddPrimitive('sphere')}
-                className="bg-slate-900 hover:bg-pink-600/30 border border-slate-700 hover:border-pink-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-pink-600/30 border border-slate-300 dark:border-slate-700 hover:border-pink-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Esfera Geométrica"
               >
                 <Circle className="w-3.5 h-3.5 text-pink-400" />
@@ -1404,14 +1582,14 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
           {/* Rocket Specific Components */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-mono font-semibold text-slate-300 flex items-center gap-1.5">
+            <span className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-red-500" />
               Componentes de Foguete:
             </span>
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => handleAddRocketShape('fin')}
-                className="bg-slate-900 hover:bg-red-600/30 border border-slate-700 hover:border-red-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-red-600/30 border border-slate-300 dark:border-slate-700 hover:border-red-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Aleta Aerodinâmica"
               >
                 <Wind className="w-3.5 h-3.5 text-red-400" />
@@ -1419,7 +1597,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddRocketShape('nosecone')}
-                className="bg-slate-900 hover:bg-red-600/30 border border-slate-700 hover:border-red-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-red-600/30 border border-slate-300 dark:border-slate-700 hover:border-red-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Coifa / Nariz Ogival"
               >
                 <Triangle className="w-3.5 h-3.5 text-red-500" />
@@ -1427,7 +1605,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddRocketShape('engine')}
-                className="bg-slate-900 hover:bg-orange-600/30 border border-slate-700 hover:border-orange-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-orange-600/30 border border-slate-300 dark:border-slate-700 hover:border-orange-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Motor & Bocal de Empuxo"
               >
                 <Flame className="w-3.5 h-3.5 text-orange-400" />
@@ -1435,7 +1613,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddRocketShape('body_tube')}
-                className="bg-slate-900 hover:bg-cyan-600/30 border border-slate-700 hover:border-cyan-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-cyan-600/30 border border-slate-300 dark:border-slate-700 hover:border-cyan-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Tubo de Corpo / Fuselagem"
               >
                 <Cylinder className="w-3.5 h-3.5 text-cyan-400" />
@@ -1443,15 +1621,15 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </button>
               <button
                 onClick={() => handleAddRocketShape('centering_ring')}
-                className="bg-slate-900 hover:bg-slate-600/30 border border-slate-700 hover:border-slate-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-slate-600/30 border border-slate-300 dark:border-slate-700 hover:border-slate-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Anel Centrador"
               >
-                <Disc className="w-3.5 h-3.5 text-slate-400" />
+                <Disc className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                 Anel Centrador
               </button>
               <button
                 onClick={() => handleAddRocketShape('payload')}
-                className="bg-slate-900 hover:bg-purple-600/30 border border-slate-700 hover:border-purple-500 text-slate-200 hover:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-900 hover:bg-purple-600/30 border border-slate-300 dark:border-slate-700 hover:border-purple-500 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:text-white px-2.5 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition"
                 title="Inserir Módulo de Carga Útil"
               >
                 <Package className="w-3.5 h-3.5 text-purple-400" />
@@ -1469,14 +1647,14 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
         <div className="lg:col-span-5 space-y-4">
           
           {/* OBJETOS EM CENA (SCENE OBJECTS LIST WITH HIDE, LOCK, DELETE) */}
-          <div className="bg-[#111827] border border-slate-800 rounded-lg p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider flex items-center gap-2">
+          <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 rounded-lg p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-2">
+              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase font-mono tracking-wider flex items-center gap-2">
                 <Layers className="w-4 h-4 text-red-500" />
                 Objetos na Cena ({models.length})
               </h3>
-              <span className="text-[10px] text-slate-400 font-mono">
-                Atalho p/ Deletar: <strong className="text-white">Delete / Backspace</strong>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                Atalho p/ Deletar: <strong className="text-slate-900 dark:text-white">Delete / Backspace</strong>
               </span>
             </div>
 
@@ -1492,8 +1670,8 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     onClick={() => setSelectedModelId(m.id)}
                     className={`p-2.5 rounded-lg border transition cursor-pointer flex items-center justify-between gap-2 ${
                       isSelected
-                        ? 'bg-red-600/20 border-red-500 text-white font-bold shadow-md'
-                        : 'bg-[#05070A] border-slate-800 text-slate-300 hover:border-slate-700'
+                        ? 'bg-red-600/20 border-red-500 text-slate-900 dark:text-white font-bold shadow-md'
+                        : 'bg-slate-50 dark:bg-[#05070A] border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:border-slate-700'
                     } ${isHidden ? 'opacity-50 italic' : ''}`}
                   >
                     <div className="flex items-center gap-2 min-w-0 truncate">
@@ -1507,7 +1685,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400 truncate">Autor: {m.author}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Autor: {m.author}</div>
                       </div>
                     </div>
 
@@ -1519,7 +1697,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                         className={`p-1.5 rounded transition ${
                           isHidden
                             ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white'
                         }`}
                         title={isHidden ? 'Visualizar Objeto na Cena' : 'Ocultar Objeto na Cena'}
                       >
@@ -1532,7 +1710,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                         className={`p-1.5 rounded transition ${
                           isLocked
                             ? 'bg-red-950/90 text-red-400 border border-red-800'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white'
                         }`}
                         title={isLocked ? 'Desbloquear Objeto' : 'Bloquear Objeto contra Edições'}
                       >
@@ -1545,7 +1723,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                           e.stopPropagation();
                           handleDeleteModelById(m.id);
                         }}
-                        className="p-1.5 bg-slate-800 hover:bg-red-600/80 text-slate-400 hover:text-white rounded transition"
+                        className="p-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-red-600/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded transition"
                         title="Deletar Objeto (Atalho: Delete / Backspace)"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1558,10 +1736,10 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           </div>
 
           {/* Transformation Sliders & Shortcut Cheatsheet */}
-          <div className="bg-[#111827] border border-slate-800 rounded-lg p-4 shadow-xl space-y-4">
+          <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 rounded-lg p-4 shadow-xl space-y-4">
             
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-white flex items-center gap-2 font-mono uppercase">
+            <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-2">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2 font-mono uppercase">
                 <Sparkles className="w-3.5 h-3.5 text-red-500" />
                 Painel de Manipulação do Modelo
                 {currentModel?.locked && (
@@ -1574,7 +1752,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={handleUndo}
                   disabled={history.length === 0 || currentModel?.locked}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 rounded text-xs transition"
+                  className="p-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-800 dark:text-slate-200 rounded text-xs transition"
                   title="Desfazer (Ctrl+Z)"
                 >
                   <Undo className="w-3.5 h-3.5" />
@@ -1582,7 +1760,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={handleRedo}
                   disabled={redoStack.length === 0 || currentModel?.locked}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 rounded text-xs transition"
+                  className="p-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-800 dark:text-slate-200 rounded text-xs transition"
                   title="Refazer (Ctrl+Y)"
                 >
                   <Redo className="w-3.5 h-3.5" />
@@ -1590,7 +1768,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={handleResetTransform}
                   disabled={currentModel?.locked}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 rounded text-xs transition"
+                  className="p-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-800 dark:text-slate-200 rounded text-xs transition"
                   title="Resetar Posição (Esc)"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -1600,7 +1778,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
             {/* Mover Sliders */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between font-mono">
                 <span className="flex items-center gap-1.5">
                   <Move className="w-3.5 h-3.5 text-red-500" />
                   Mover Posição (X, Y, Z)
@@ -1609,7 +1787,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">X: {currentModel.posX.toFixed(1)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">X: {currentModel.posX.toFixed(1)}</span>
                   <input
                     type="range"
                     min="-6"
@@ -1618,11 +1796,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.posX}
                     onChange={(e) => handleTransformChange('posX', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Y: {currentModel.posY.toFixed(1)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Y: {currentModel.posY.toFixed(1)}</span>
                   <input
                     type="range"
                     min="-6"
@@ -1631,11 +1809,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.posY}
                     onChange={(e) => handleTransformChange('posY', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Z: {currentModel.posZ.toFixed(1)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Z: {currentModel.posZ.toFixed(1)}</span>
                   <input
                     type="range"
                     min="-6"
@@ -1644,7 +1822,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.posZ}
                     onChange={(e) => handleTransformChange('posZ', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
               </div>
@@ -1652,7 +1830,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
             {/* Rotacionar Sliders */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between font-mono">
                 <span className="flex items-center gap-1.5">
                   <RotateCw className="w-3.5 h-3.5 text-red-500" />
                   Rotacionar Ângulo (X, Y, Z)
@@ -1661,7 +1839,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Rot X: {currentModel.rotX.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Rot X: {currentModel.rotX.toFixed(2)}</span>
                   <input
                     type="range"
                     min="-3.14"
@@ -1670,11 +1848,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.rotX}
                     onChange={(e) => handleTransformChange('rotX', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Rot Y: {currentModel.rotY.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Rot Y: {currentModel.rotY.toFixed(2)}</span>
                   <input
                     type="range"
                     min="-3.14"
@@ -1683,11 +1861,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.rotY}
                     onChange={(e) => handleTransformChange('rotY', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Rot Z: {currentModel.rotZ.toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Rot Z: {currentModel.rotZ.toFixed(2)}</span>
                   <input
                     type="range"
                     min="-3.14"
@@ -1696,7 +1874,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.rotZ}
                     onChange={(e) => handleTransformChange('rotZ', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
               </div>
@@ -1704,7 +1882,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
             {/* Escalar Sliders */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between font-mono">
                 <span className="flex items-center gap-1.5">
                   <Maximize2 className="w-3.5 h-3.5 text-red-500" />
                   Escalar Dimensão (X, Y, Z)
@@ -1713,7 +1891,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Esc X: {currentModel.scaleX.toFixed(1)}x</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Esc X: {currentModel.scaleX.toFixed(1)}x</span>
                   <input
                     type="range"
                     min="0.2"
@@ -1722,11 +1900,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.scaleX}
                     onChange={(e) => handleTransformChange('scaleX', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Esc Y: {currentModel.scaleY.toFixed(1)}x</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Esc Y: {currentModel.scaleY.toFixed(1)}x</span>
                   <input
                     type="range"
                     min="0.2"
@@ -1735,11 +1913,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.scaleY}
                     onChange={(e) => handleTransformChange('scaleY', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-mono">Esc Z: {currentModel.scaleZ.toFixed(1)}x</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Esc Z: {currentModel.scaleZ.toFixed(1)}x</span>
                   <input
                     type="range"
                     min="0.2"
@@ -1748,26 +1926,26 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                     disabled={currentModel?.locked}
                     value={currentModel.scaleZ}
                     onChange={(e) => handleTransformChange('scaleZ', parseFloat(e.target.value))}
-                    className="w-full accent-red-500 h-1 bg-slate-800 rounded disabled:opacity-30"
+                    className="w-full accent-red-500 h-1 bg-slate-200 dark:bg-slate-800 rounded disabled:opacity-30"
                   />
                 </div>
               </div>
             </div>
 
             {/* Keyboard Shortcuts Reference Box */}
-            <div className="p-3 bg-[#05070A] rounded-lg border border-slate-800 space-y-1.5 font-mono text-[10px] text-slate-400">
-              <div className="font-bold text-slate-300 flex items-center gap-1">
+            <div className="p-3 bg-slate-50 dark:bg-[#05070A] rounded-lg border border-slate-300 dark:border-slate-800 space-y-1.5 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+              <div className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                 <Keyboard className="w-3.5 h-3.5 text-red-400" />
                 Guia de Teclas de Atalho:
               </div>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-slate-400">
-                <span>• <strong className="text-white">G / M</strong>: Modo Mover</span>
-                <span>• <strong className="text-white">R</strong>: Modo Rotacionar</span>
-                <span>• <strong className="text-white">S</strong>: Modo Escalar</span>
-                <span>• <strong className="text-white">Del / Backspace</strong>: Deletar</span>
-                <span>• <strong className="text-white">Ctrl+Z</strong>: Desfazer</span>
-                <span>• <strong className="text-white">Ctrl+Y</strong>: Refazer</span>
-                <span>• <strong className="text-white">Esc</strong>: Resetar Origem</span>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-slate-500 dark:text-slate-400">
+                <span>• <strong className="text-slate-900 dark:text-white">G / M</strong>: Modo Mover</span>
+                <span>• <strong className="text-slate-900 dark:text-white">R</strong>: Modo Rotacionar</span>
+                <span>• <strong className="text-slate-900 dark:text-white">S</strong>: Modo Escalar</span>
+                <span>• <strong className="text-slate-900 dark:text-white">Del / Backspace</strong>: Deletar</span>
+                <span>• <strong className="text-slate-900 dark:text-white">Ctrl+Z</strong>: Desfazer</span>
+                <span>• <strong className="text-slate-900 dark:text-white">Ctrl+Y</strong>: Refazer</span>
+                <span>• <strong className="text-slate-900 dark:text-white">Esc</strong>: Resetar Origem</span>
               </div>
             </div>
 
@@ -1776,11 +1954,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
         {/* Right 3D Viewport with On-Screen Toolbar (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-[#111827] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative">
+          <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative">
             
             {/* Viewport Header Toolbar */}
-            <div className="p-3 bg-slate-950/90 border-b border-slate-800 flex justify-between items-center text-xs font-mono">
-              <span className="font-semibold text-slate-200 flex items-center gap-2">
+            <div className="p-3 bg-white/90 dark:bg-slate-950/90 border-b border-slate-300 dark:border-slate-800 flex justify-between items-center text-xs font-mono">
+              <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Box className="w-4 h-4 text-red-500" />
                 {currentModel.title}
                 {currentModel.locked && (
@@ -1795,7 +1973,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={() => setActiveGizmoTool('move')}
                   className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition ${
-                    activeGizmoTool === 'move' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:text-white'
+                    activeGizmoTool === 'move' ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white'
                   }`}
                   title="Mover (M)"
                 >
@@ -1805,7 +1983,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={() => setActiveGizmoTool('rotate')}
                   className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition ${
-                    activeGizmoTool === 'rotate' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:text-white'
+                    activeGizmoTool === 'rotate' ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white'
                   }`}
                   title="Rotacionar (R)"
                 >
@@ -1815,7 +1993,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 <button
                   onClick={() => setActiveGizmoTool('scale')}
                   className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition ${
-                    activeGizmoTool === 'scale' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:text-white'
+                    activeGizmoTool === 'scale' ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white'
                   }`}
                   title="Escalar (S)"
                 >
@@ -1846,21 +2024,21 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             </div>
 
             {/* WebGL Canvas Mounting Box */}
-            <div className="relative w-full h-[480px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800">
+            <div className="relative w-full h-[480px] bg-slate-100 dark:bg-slate-950 rounded-lg overflow-hidden border border-slate-300 dark:border-slate-800">
               
               {/* View Cube Buttons Overlay */}
               <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
-                <div className="text-[9px] font-mono text-slate-600 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-1">Vistas CAD</div>
-                <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                <div className="text-[9px] font-mono text-slate-600 dark:text-slate-500 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-1">Vistas CAD</div>
+                <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white p-1.5 rounded border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
                   <span className="group-hover:translate-x-0.5 transition-transform">Topo</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                 </button>
-                <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white p-1.5 rounded border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
                   <span className="group-hover:translate-x-0.5 transition-transform">Frente</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                 </button>
-                <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white p-1.5 rounded border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
                   <span className="group-hover:translate-x-0.5 transition-transform">Lado</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                 </button>
-                <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white p-1.5 rounded border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
                   <span className="group-hover:translate-x-0.5 transition-transform">Iso</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                 </button>
               </div>
@@ -1869,21 +2047,21 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               <div className="absolute top-2 left-2 flex gap-1 z-10">
                 <button 
                   onClick={() => setActiveGizmoTool('move')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                   title="Mover [G / M]"
                 >
                   <Move className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => setActiveGizmoTool('rotate')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                   title="Rotacionar [R]"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => setActiveGizmoTool('scale')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                   title="Escalar [S]"
                 >
                   <Maximize2 className="w-4 h-4" />
@@ -1895,12 +2073,12 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             </div>
 
             {/* Footer Details */}
-            <div className="p-3.5 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="p-3.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-300 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
-                <div className="text-xs font-semibold text-white">
-                  Descrição: <span className="text-slate-300 font-normal">{currentModel.description}</span>
+                <div className="text-xs font-semibold text-slate-900 dark:text-white">
+                  Descrição: <span className="text-slate-700 dark:text-slate-300 font-normal">{currentModel.description}</span>
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                   Autor da Contribuição: <strong className="text-red-400">{currentModel.author}</strong>
                 </div>
               </div>
@@ -1923,8 +2101,8 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
       {/* FULLSCREEN EXPANDED 3D VIEWPORT MODAL */}
       {isExpanded && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col p-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3 font-mono">
+        <div className="fixed inset-0 z-50 bg-white/95 dark:bg-black/95 backdrop-blur-md flex flex-col p-4">
+          <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-3 font-mono">
             <div className="flex items-center gap-3">
               <span className="text-red-500 font-bold text-base flex items-center gap-2">
                 <Box className="w-5 h-5 text-red-500" />
@@ -1938,21 +2116,21 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleUndo}
-                className="bg-slate-800 text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-700 flex items-center gap-1"
+                className="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center gap-1"
               >
                 <Undo className="w-3.5 h-3.5" />
                 Desfazer
               </button>
               <button
                 onClick={handleRedo}
-                className="bg-slate-800 text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-700 flex items-center gap-1"
+                className="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center gap-1"
               >
                 <Redo className="w-3.5 h-3.5" />
                 Refazer
               </button>
               <button
                 onClick={handleResetTransform}
-                className="bg-slate-800 text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-700 flex items-center gap-1"
+                className="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center gap-1"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Resetar
@@ -1968,20 +2146,20 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           </div>
 
           {/* Fullscreen Canvas Container */}
-          <div className="flex-1 relative w-full my-3 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+          <div className="flex-1 relative w-full my-3 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-300 dark:border-slate-800 overflow-hidden">
             {/* View Cube Buttons Overlay */}
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-              <div className="text-xs font-mono text-slate-600 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-2 py-0.5">Vistas CAD</div>
-              <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+              <div className="text-xs font-mono text-slate-600 dark:text-slate-500 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-2 py-0.5">Vistas CAD</div>
+              <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
                 <span className="group-hover:translate-x-1 transition-transform">Topo</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
               </button>
-              <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+              <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
                 <span className="group-hover:translate-x-1 transition-transform">Frente</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
               </button>
-              <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+              <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
                 <span className="group-hover:translate-x-1 transition-transform">Lado</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
               </button>
-              <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+              <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-slate-900 dark:text-white hover:text-slate-900 dark:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
                 <span className="group-hover:translate-x-1 transition-transform">Iso</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
               </button>
             </div>
@@ -1990,21 +2168,21 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             <div className="absolute top-4 left-4 flex gap-2 z-10">
               <button 
                 onClick={() => setActiveGizmoTool('move')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                 title="Mover [G / M]"
               >
                 <Move className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setActiveGizmoTool('rotate')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                 title="Rotacionar [R]"
               >
                 <RotateCw className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setActiveGizmoTool('scale')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-slate-900 dark:text-white' : 'bg-white/90 dark:bg-white/80 dark:bg-slate-900/80 border-slate-300 dark:border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-slate-900 dark:text-white'}`}
                 title="Escalar [S]"
               >
                 <Maximize2 className="w-5 h-5" />
@@ -2016,14 +2194,14 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           </div>
 
           {/* Expanded Bottom Controls */}
-          <div className="bg-[#111827] border border-slate-800 p-3 rounded-xl flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-slate-300">
+          <div className="bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-800 p-3 rounded-xl flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-slate-700 dark:text-slate-300">
             <div className="flex items-center gap-4">
               <span>Posição (X,Y,Z): <strong>{currentModel.posX.toFixed(1)}, {currentModel.posY.toFixed(1)}, {currentModel.posZ.toFixed(1)}</strong></span>
               <span>Rotação: <strong>{currentModel.rotX.toFixed(2)}, {currentModel.rotY.toFixed(2)}, {currentModel.rotZ.toFixed(2)}</strong></span>
               <span>Escala: <strong>{currentModel.scaleX.toFixed(1)}x</strong></span>
             </div>
-            <div className="text-slate-400 text-[11px]">
-              Utilize o mouse para rotacionar. Pressione <strong className="text-white">G (Mover)</strong>, <strong className="text-white">R (Rotacionar)</strong>, <strong className="text-white">S (Escalar)</strong>, <strong className="text-white">Del / Backspace (Deletar)</strong>.
+            <div className="text-slate-500 dark:text-slate-400 text-[11px]">
+              Utilize o mouse para rotacionar. Pressione <strong className="text-slate-900 dark:text-white">G (Mover)</strong>, <strong className="text-slate-900 dark:text-white">R (Rotacionar)</strong>, <strong className="text-slate-900 dark:text-white">S (Escalar)</strong>, <strong className="text-slate-900 dark:text-white">Del / Backspace (Deletar)</strong>.
             </div>
           </div>
         </div>
@@ -2031,33 +2209,33 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
       {/* Modal - Add New Procedural 3D Model */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-black border border-slate-800 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-100 font-sans">
-            <h3 className="text-base font-bold text-white flex items-center gap-2 font-mono">
+        <div className="fixed inset-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-black border border-slate-300 dark:border-slate-800 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-slate-100 font-sans">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 font-mono">
               <Box className="w-5 h-5 text-red-500" />
               Cadastrar Modelo Procedural 3D
             </h3>
 
             <form onSubmit={handleAddModel} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Título do Modelo</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Título do Modelo</label>
                 <input
                   type="text"
                   required
                   placeholder="Ex: Foguete Amador Classe H - Veloce"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white outline-none font-mono"
+                  className="w-full bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Categoria de Peça</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Categoria de Peça</label>
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value as User3DModel['type'])}
-                    className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white outline-none font-mono"
+                    className="w-full bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none font-mono"
                   >
                     <option value="foguete_completo">Foguete Completo</option>
                     <option value="coifa">Coifa (Nosecone)</option>
@@ -2068,11 +2246,11 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Geometria Mesh Base</label>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Geometria Mesh Base</label>
                   <select
                     value={newMeshType}
                     onChange={(e) => setNewMeshType(e.target.value as User3DModel['meshType'])}
-                    className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white outline-none font-mono"
+                    className="w-full bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none font-mono"
                   >
                     <option value="cylinder_rocket">Cilíndrico Monostágio</option>
                     <option value="multistage">Multiestágio Avançado</option>
@@ -2083,42 +2261,42 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Cor do Modelo</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Cor do Modelo</label>
                 <input
                   type="color"
                   value={newColor}
                   onChange={(e) => setNewColor(e.target.value)}
-                  className="w-full h-9 bg-[#05070A] border border-slate-800 rounded-lg cursor-pointer p-1"
+                  className="w-full h-9 bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg cursor-pointer p-1"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Descrição Técnica</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Descrição Técnica</label>
                 <textarea
                   rows={2}
                   placeholder="Especifique massa, dimensão do tubo e impulso total..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white outline-none"
+                  className="w-full bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Link Externo (Google Drive / CAD)</label>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Link Externo (Google Drive / CAD)</label>
                 <input
                   type="url"
                   placeholder="https://drive.google.com/..."
                   value={newLink}
                   onChange={(e) => setNewLink(e.target.value)}
-                  className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white outline-none font-mono"
+                  className="w-full bg-slate-50 dark:bg-[#05070A] border border-slate-300 dark:border-slate-800 rounded-lg p-2.5 text-slate-900 dark:text-white outline-none font-mono"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-300 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 font-mono"
+                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-700 font-mono"
                 >
                   Cancelar
                 </button>
