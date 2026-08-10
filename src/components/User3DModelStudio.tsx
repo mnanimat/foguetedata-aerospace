@@ -1850,32 +1850,40 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               
               {/* View Cube Buttons Overlay */}
               <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
-                <div className="text-[9px] font-mono text-slate-400 text-center uppercase tracking-widest mb-1">Vistas CAD</div>
-                <button onClick={() => handleSetView('top')} className="bg-slate-900/80 hover:bg-red-600/90 text-white p-1.5 rounded border border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono">Topo</button>
-                <button onClick={() => handleSetView('front')} className="bg-slate-900/80 hover:bg-red-600/90 text-white p-1.5 rounded border border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono">Frente</button>
-                <button onClick={() => handleSetView('side')} className="bg-slate-900/80 hover:bg-red-600/90 text-white p-1.5 rounded border border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono">Lado</button>
-                <button onClick={() => handleSetView('iso')} className="bg-slate-900/80 hover:bg-red-600/90 text-white p-1.5 rounded border border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono">Iso</button>
+                <div className="text-[9px] font-mono text-slate-600 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-1">Vistas CAD</div>
+                <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                  <span className="group-hover:translate-x-0.5 transition-transform">Topo</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                </button>
+                <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                  <span className="group-hover:translate-x-0.5 transition-transform">Frente</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                </button>
+                <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                  <span className="group-hover:translate-x-0.5 transition-transform">Lado</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                </button>
+                <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white p-1.5 rounded border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-[10px] font-mono flex items-center justify-between gap-2 group">
+                  <span className="group-hover:translate-x-0.5 transition-transform">Iso</span><Box className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                </button>
               </div>
 
               {/* Transform Tool Shortcuts Overlay */}
               <div className="absolute top-2 left-2 flex gap-1 z-10">
                 <button 
                   onClick={() => setActiveGizmoTool('move')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                   title="Mover [G / M]"
                 >
                   <Move className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => setActiveGizmoTool('rotate')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                   title="Rotacionar [R]"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => setActiveGizmoTool('scale')} 
-                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                  className={`p-2 rounded border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                   title="Escalar [S]"
                 >
                   <Maximize2 className="w-4 h-4" />
@@ -1963,32 +1971,40 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           <div className="flex-1 relative w-full my-3 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
             {/* View Cube Buttons Overlay */}
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-              <div className="text-xs font-mono text-slate-400 text-center uppercase tracking-widest mb-1">Vistas CAD</div>
-              <button onClick={() => handleSetView('top')} className="bg-slate-900/80 hover:bg-red-600/90 text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono">Topo</button>
-              <button onClick={() => handleSetView('front')} className="bg-slate-900/80 hover:bg-red-600/90 text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono">Frente</button>
-              <button onClick={() => handleSetView('side')} className="bg-slate-900/80 hover:bg-red-600/90 text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono">Lado</button>
-              <button onClick={() => handleSetView('iso')} className="bg-slate-900/80 hover:bg-red-600/90 text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono">Iso</button>
+              <div className="text-xs font-mono text-slate-600 dark:text-slate-400 text-center uppercase tracking-widest mb-1 font-bold bg-white/80 dark:bg-transparent rounded px-2 py-0.5">Vistas CAD</div>
+              <button onClick={() => handleSetView('top')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+                <span className="group-hover:translate-x-1 transition-transform">Topo</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+              </button>
+              <button onClick={() => handleSetView('front')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+                <span className="group-hover:translate-x-1 transition-transform">Frente</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+              </button>
+              <button onClick={() => handleSetView('side')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+                <span className="group-hover:translate-x-1 transition-transform">Lado</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+              </button>
+              <button onClick={() => handleSetView('iso')} className="bg-white/90 dark:bg-slate-900/80 hover:bg-red-600 dark:hover:bg-red-600/90 text-slate-800 dark:text-white hover:text-white px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-red-500 transition shadow-lg text-xs font-mono flex items-center justify-between gap-3 group">
+                <span className="group-hover:translate-x-1 transition-transform">Iso</span><Box className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+              </button>
             </div>
 
             {/* Transform Tool Shortcuts Overlay */}
             <div className="absolute top-4 left-4 flex gap-2 z-10">
               <button 
                 onClick={() => setActiveGizmoTool('move')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'move' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                 title="Mover [G / M]"
               >
                 <Move className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setActiveGizmoTool('rotate')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'rotate' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                 title="Rotacionar [R]"
               >
                 <RotateCw className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setActiveGizmoTool('scale')} 
-                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'}`}
+                className={`p-3 rounded-lg border transition shadow-lg ${activeGizmoTool === 'scale' ? 'bg-red-600 border-red-400 text-white' : 'bg-white/90 dark:bg-slate-900/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-400 hover:text-red-600 dark:hover:text-white'}`}
                 title="Escalar [S]"
               >
                 <Maximize2 className="w-5 h-5" />
