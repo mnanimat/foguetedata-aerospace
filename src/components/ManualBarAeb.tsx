@@ -15,7 +15,7 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
       id: 'c1',
       authorName: 'Micael Nildo',
       email: 'micaelnildo@mnanimat.xyz',
-      institution: 'MNAnimat Aerospace & AI',
+      institution: 'MNAnimat Aerospace',
       topicTitle: '4. Eletrônica, Localizadores e Modelagem 3D em Tempo Real',
       proposedContent:
         'Proposta de diretrizes para padronização de interfaces de telemetria LoRa (915 MHz) integradas a computadores de voo ESP32. Inclui procedimentos de teste para verificação da taxa de atualização do barômetro em câmara de vácuo, isolamento eletromagnético de servomotores e exportação de telemetria para renderização 3D em tempo real.',
@@ -25,10 +25,10 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
     }
   ]);
 
-  // Special Form State for Micael Nildo & General Contributors
-  const [authorName, setAuthorName] = useState('Micael Nildo');
-  const [authorEmail, setAuthorEmail] = useState('micaelnildo@mnanimat.xyz');
-  const [authorInstitution, setAuthorInstitution] = useState('BAR / MNAnimat Research');
+  // Form State
+  const [authorName, setAuthorName] = useState('');
+  const [authorEmail, setAuthorEmail] = useState('');
+  const [authorInstitution, setAuthorInstitution] = useState('');
   const [topicTitle, setTopicTitle] = useState('3. Propelentes, Materiais e Testes Estáticos');
   const [customTopicTitle, setCustomTopicTitle] = useState('');
   const [proposedContent, setProposedContent] = useState('');
@@ -75,13 +75,19 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
             Manual BAR-AEB de Boas Práticas em Foguetemodelismo
           </h1>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Prezado membro da <strong>BAR (Associação Brasileira de Minifoguetes - Associação sem fins lucrativos)</strong> e pesquisadores parceiros da <strong>AEB (Agência Espacial Brasileira)</strong>. Vamos iniciar um esforço conjunto para termos até o primeiro semestre de 2027 a primeira versão consolidada do <strong>Manual BAR-AEB de boas práticas em foguetemodelismo</strong>.
+          <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+            Prezado membro da BAR e demais fogueteiros brasileiros.
+
+            Vamos iniciar um esforço conjunto para termos até o primeiro semestre do próximo ano uma primeira versão do manual BAR-AEB de boas práticas em foguetemodelismo.
+
+            Como documento de referência, usaremos o manual da Agência Espacial Brasileira - AEB, 
+            gerado em 2023. Duas versões dele estão disponíveis no seguinte link:
+            <a href="https://drive.google.com/drive/folders/1-p2vv-CPYN58ABkRV371PNZVm7HUmpuQ?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">https://drive.google.com/drive/folders/1-p2vv-CPYN58ABkRV371PNZVm7HUmpuQ?usp=sharing <ExternalLink className="w-3 h-3" /></a>
           </p>
 
           <div className="flex flex-wrap gap-2 text-[10px] font-mono">
             <span className="bg-blue-950/80 border border-blue-600/50 text-blue-300 px-2.5 py-1 rounded-md">
-              🏛️ <strong>BAR:</strong> Associação sem fins lucrativos
+              🏛️ <strong>BAR:</strong> Associação Brasileira de Minifoguetes
             </span>
             <span className="bg-purple-950/80 border border-purple-600/50 text-purple-300 px-2.5 py-1 rounded-md">
               🇧🇷 <strong>AEB:</strong> Agência Espacial Brasileira (Governo Federal)
@@ -101,11 +107,11 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
             </a>
 
             <a
-              href="mailto:nome@mnanimat.xyz"
+              href="mailto:minifoguete@gmail.com"
               className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs px-3 py-1.5 rounded transition"
             >
               <Mail className="w-3.5 h-3.5 text-emerald-400" />
-              Propostas: nome@mnanimat.xyz
+              Propostas: minifoguete@gmail.com
             </a>
           </div>
         </div>
@@ -141,6 +147,7 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
               <input
                 type="text"
                 required
+                placeholder="Digite sua resposta..."
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
                 className="w-full bg-[#05070A] border border-slate-800 rounded p-2 text-white focus:border-blue-500 outline-none font-mono"
@@ -152,6 +159,7 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
               <input
                 type="email"
                 required
+                placeholder="Digite sua resposta..."
                 value={authorEmail}
                 onChange={(e) => setAuthorEmail(e.target.value)}
                 className="w-full bg-[#05070A] border border-slate-800 rounded p-2 text-white focus:border-blue-500 outline-none font-mono"
@@ -162,6 +170,7 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
               <label className="block text-slate-300 font-semibold mb-1 font-mono text-[11px]">Instituição / Equipe</label>
               <input
                 type="text"
+                placeholder="Digite sua resposta..."
                 value={authorInstitution}
                 onChange={(e) => setAuthorInstitution(e.target.value)}
                 className="w-full bg-[#05070A] border border-slate-800 rounded p-2 text-white focus:border-blue-500 outline-none font-mono"
@@ -255,7 +264,7 @@ export const ManualBarAeb: React.FC<ManualBarAebProps> = ({ currentUser, onOpenA
                       <span className="font-bold text-white text-sm">{c.authorName}</span>
                       {c.isSpecialAuthor && (
                         <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold">
-                          Autor Destaque
+                          Autor(a)
                         </span>
                       )}
                     </div>

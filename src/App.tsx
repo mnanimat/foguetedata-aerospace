@@ -13,21 +13,15 @@ import { AuthModal } from './components/AuthModal';
 import { FallingRocketryRain } from './components/FallingRocketryRain';
 import { RocketAudioPlayer } from './components/RocketAudioPlayer';
 import { EXTERNAL_LINKS } from './data/knowledgeData';
-import { ExternalLink, Layers, Box, Sparkles, Heart } from 'lucide-react';
+import { ExternalLink, Layers, Box, Sparkles, Heart, Mail } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('trajectory');
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(true);
 
-  // Default Authenticated User State (Micael Nildo)
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'mn_01',
-    name: 'Micael Nildo',
-    email: 'micaelnildo@mnanimat.xyz',
-    teamName: 'MNAnimat Aerospace',
-    role: 'Engenheiro'
-  });
+  // Default Authenticated User State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   return (
     <ThemeProvider>
@@ -103,10 +97,19 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-2 text-center md:text-left">
               <span className="font-bold text-slate-300 dark:text-slate-300 light:text-slate-800">© 2026 FogueteData Aerospace</span>
               <span className="text-slate-700 dark:text-slate-700 light:text-slate-300">|</span>
-              <span>Desenvolvedor: <strong className="text-slate-300 dark:text-slate-300 light:text-slate-800">Micael Nildo com auxílio de IA</strong></span>
+              <span>Desenvolvedor: <strong className="text-slate-300 dark:text-slate-300 light:text-slate-800">Micael Nildo Oliveira Souza com auxílio de Inteligência Artificial (IA)</strong></span>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
+              <a
+                href="mailto:micaelnildo@mnanimat.xyz"
+                className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-400 light:text-slate-600 hover:text-emerald-400 transition"
+                title="Contato e Sugestões de Melhoria"
+              >
+                <Mail className="w-3 h-3 text-emerald-400" />
+                micaelnildo@mnanimat.xyz
+              </a>
+
               <a
                 href={EXTERNAL_LINKS.mnanimat3d}
                 target="_blank"

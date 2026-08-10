@@ -1897,17 +1897,15 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
                 </div>
               </div>
 
-              {currentModel.driveOrVideoLink && (
-                <a
-                  href={currentModel.driveOrVideoLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 bg-red-950/80 px-3 py-1.5 rounded-lg border border-red-500/30 whitespace-nowrap font-mono"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Abrir Anexo CAD
-                </a>
-              )}
+              <a
+                href="https://cad.mnanimat.xyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 bg-red-950/80 px-3 py-1.5 rounded-lg border border-red-500/30 whitespace-nowrap font-mono"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Abrir CADMNAnimat
+              </a>
             </div>
 
           </div>

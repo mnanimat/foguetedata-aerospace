@@ -11,10 +11,10 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
-  const [name, setName] = useState('Micael Nildo');
-  const [email, setEmail] = useState('micaelnildo@mnanimat.xyz');
-  const [teamName, setTeamName] = useState('MNAnimat Aerospace');
-  const [organizationName, setOrganizationName] = useState('Universidade / Instituição de Pesquisa');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [teamName, setTeamName] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
   const [roleSelect, setRoleSelect] = useState<string>('Engenheiro');
   const [customRoleInput, setCustomRoleInput] = useState<string>('');
   const [isAgeVerified, setIsAgeVerified] = useState<boolean>(true);
@@ -26,7 +26,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!isAgeVerified) {
       alert('Para conformidade legal no Brasil (ECA, LGPD e Diretrizes de Foguetemodelismo AEB), confirme a declaração de idade e autorização.');
       return;
@@ -36,13 +35,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
       id: 'usr_' + Date.now(),
       name: name || 'Fogueteiro Colaborador',
       email: email || 'fogueteiro@foguetedata.org',
-      teamName: teamName || 'MNAnimat AeroSpace',
+      teamName: teamName || 'Equipe',
       organizationName: organizationName || 'Independente / Institucional',
       role: finalRole,
       customRole: customRoleInput.trim() !== '' ? customRoleInput : undefined,
       isAgeVerified: true
     };
     onLogin(user);
+    onClose();
+  };
+
+  const handleVisitor = () => {
     onClose();
   };
 
@@ -86,6 +89,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                 <input
                   type="text"
                   required
+                  placeholder="Digite o nome completo"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white focus:border-red-500 outline-none font-mono text-xs"
@@ -98,6 +102,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               <input
                 type="email"
                 required
+                placeholder="Digite o e-mail de contato"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white focus:border-red-500 outline-none font-mono text-xs"
@@ -109,6 +114,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               <input
                 type="password"
                 required
+                placeholder="Digite a senha"
                 defaultValue="123456"
                 className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white focus:border-red-500 outline-none font-mono text-xs"
               />
@@ -139,7 +145,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
-                  placeholder="Nome da Equipe"
+                  placeholder="Digite o nome da equipe"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   className="w-full bg-[#05070A] border border-slate-800 rounded-lg p-2.5 text-white focus:border-red-500 outline-none font-mono text-xs"
@@ -220,6 +226,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
               className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-600/30 transition text-xs font-mono uppercase tracking-wider"
             >
               {isRegister ? 'Concluir Cadastro Local' : 'Entrar na Plataforma Local'}
+            </button>
+            <button
+              type="button"
+              onClick={handleVisitor}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl shadow-lg transition text-xs font-mono uppercase tracking-wider mt-2"
+            >
+              Acessar como Visitante
             </button>
           </form>
 

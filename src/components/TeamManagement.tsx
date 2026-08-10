@@ -204,7 +204,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
     id: 'mem_1',
     name: 'Micael Nildo',
     email: 'micaelnildo@mnanimat.xyz',
-    role: 'Engenheiro Chefe de Propulsão & Fundador',
+    role: 'Desenvolvedor Sênior de Propulsão & Pesquisador Principal',
     departmentId: 'dep_prop',
     subsystemRole: 'Dimensionamento de Motores e Bocal De Laval',
     accessLevel: 'Líder de Área',
@@ -227,7 +227,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_3',
     name: 'Nome 2',
-    email: 'nome2@mnanimat.xyz',
+    email: 'nome@mnanimat.xyz',
     role: 'Especialista em Aviônica & LoRa',
     departmentId: 'dep_avio',
     subsystemRole: 'Computador de Voo Dual-Event & Telemetria',
@@ -239,7 +239,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_4',
     name: 'Nome 3',
-    email: 'nome3@mnanimat.xyz',
+    email: 'nome@mnanimat.xyz',
     role: 'Desenvolvedora de Sistemas de Recuperação',
     departmentId: 'dep_rec',
     subsystemRole: 'Costura Ripstop & Cargas Pirotécnicas',
@@ -251,7 +251,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_5',
     name: 'Nome 4',
-    email: 'nome4@mnanimat.xyz',
+    email: 'nome@mnanimat.xyz',
     role: 'Gestor de Suprimentos & Reativos',
     departmentId: 'dep_log',
     subsystemRole: 'Aquisição de KNO3/Sorbitol & Transporte',
@@ -2080,7 +2080,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, onO
                 Membros da Equipe & Importação de Planilha
               </h3>
               <p className="text-xs text-slate-400">
-                Cadastre individualmente ou importe tabelas inteiras via CSV/Excel para gerenciar líderes, alunos e pesquisadores.
+                Cadastre individualmente ou importe tabelas inteiras via CSV/Google Planilhas para gerenciar líderes, alunos e pesquisadores.
               </p>
             </div>
 

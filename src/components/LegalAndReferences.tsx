@@ -30,7 +30,7 @@ export const LegalAndReferences: React.FC = () => {
           <div>
             <div className="text-[10px] font-mono text-blue-300 uppercase">Créditos de Desenvolvimento e Autoria</div>
             <h3 className="text-base font-bold text-white tracking-tight">
-              Desenvolvedor: Micael Nildo com auxílio de inteligência artificial
+              Desenvolvedor: Micael Nildo Oliveira Souza com auxílio de Inteligência Artificial.
             </h3>
           </div>
         </div>
