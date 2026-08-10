@@ -215,7 +215,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_2',
     name: 'Nome 1',
-    email: 'nome@mnanimat.xyz',
+    email: 'minifoguetes@gmail.com',
     role: 'Líder de Aerodinâmica',
     departmentId: 'dep_aero',
     subsystemRole: 'Análise CFD & Estruturas de Vidro/Carbono',
@@ -227,7 +227,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_3',
     name: 'Nome 2',
-    email: 'nome@mnanimat.xyz',
+    email: 'minifoguetes@gmail.com',
     role: 'Especialista em Aviônica & LoRa',
     departmentId: 'dep_avio',
     subsystemRole: 'Computador de Voo Dual-Event & Telemetria',
@@ -239,7 +239,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_4',
     name: 'Nome 3',
-    email: 'nome@mnanimat.xyz',
+    email: 'minifoguetes@gmail.com',
     role: 'Desenvolvedora de Sistemas de Recuperação',
     departmentId: 'dep_rec',
     subsystemRole: 'Costura Ripstop & Cargas Pirotécnicas',
@@ -251,7 +251,7 @@ const INITIAL_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'mem_5',
     name: 'Nome 4',
-    email: 'nome@mnanimat.xyz',
+    email: 'minifoguetes@gmail.com',
     role: 'Gestor de Suprimentos & Reativos',
     departmentId: 'dep_log',
     subsystemRole: 'Aquisição de KNO3/Sorbitol & Transporte',

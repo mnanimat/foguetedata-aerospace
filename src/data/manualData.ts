@@ -17,7 +17,7 @@ export const MANUAL_TIMELINE: TimelineStep[] = [
   {
     date: '20 Ago 2026',
     title: 'Submissão de Tópicos e Ajustes de Estrutura',
-    description: 'Prazo para todos os fogueteiros e equipes sugerirem inclusão, junção ou eliminação de tópicos via nome@mnanimat.xyz.',
+    description: 'Prazo para todos os fogueteiros e equipes sugerirem inclusão, junção ou eliminação de tópicos via minifoguetes@gmail.com.',
     responsible: 'Comunidade e Fogueteiros do Brasil',
     status: 'em_andamento'
   },
