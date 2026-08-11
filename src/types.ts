@@ -108,7 +108,7 @@ export interface User3DModel {
   id: string;
   title: string;
   author: string;
-  type: 'foguete_completo' | 'coifa' | 'aletagem' | 'motor' | 'payload';
+  type: 'foguete_completo' | 'coifa' | 'aletagem' | 'motor' | 'payload' | 'peca_solida';
   meshType: 'cylinder_rocket' | 'multistage' | 'heavy_lift' | 'experimental_mini';
   primitiveShape?: 'cube' | 'arc' | 'cone' | 'pyramid' | 'cylinder' | 'sphere' | 'fin' | 'nosecone' | 'engine' | 'body_tube' | 'centering_ring' | 'payload' | 'imported';
   visible?: boolean;

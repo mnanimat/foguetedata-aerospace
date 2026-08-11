@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Cpu, 
@@ -21,6 +21,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { CadResource, User } from '../types';
+import { getStoredCadResources, saveStoredCadResources } from '../utils/offlineCache';
 
 interface CadRepositoryProps {
   currentUser: User | null;
@@ -138,7 +139,11 @@ export const CadRepository: React.FC<CadRepositoryProps> = ({
   currentUser,
   onOpenAuthModal
 }) => {
-  const [resources, setResources] = useState<CadResource[]>(INITIAL_RESOURCES);
+  const [resources, setResources] = useState<CadResource[]>(() => getStoredCadResources(INITIAL_RESOURCES));
+
+  useEffect(() => {
+    saveStoredCadResources(resources);
+  }, [resources]);
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [selectedLicenseFilter, setSelectedLicenseFilter] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');

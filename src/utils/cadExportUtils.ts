@@ -2,6 +2,18 @@ import { jsPDF } from 'jspdf';
 import * as THREE from 'three';
 import { User3DModel } from '../types';
 
+export interface CadTitleBlockCustom {
+  drawingTitle?: string;
+  authorName?: string;
+  teamName?: string;
+  drawingNumber?: string;
+  date?: string;
+  scale?: string;
+  material?: string;
+  revision?: string;
+  tolerance?: string;
+}
+
 export interface CadParametricSpecs {
   lengthMm: number;
   diameterMm: number;
@@ -18,6 +30,7 @@ export interface CadParametricSpecs {
   extrusionDepthMm?: number;
   patternCount?: number;
   patternRadiusMm?: number;
+  titleBlock?: CadTitleBlockCustom;
 }
 
 /**
@@ -281,13 +294,24 @@ export function generateTechnicalDrawingPDF(
   doc.line(tbX + 80, tbY, tbX + 80, tbY + 22);
   doc.line(tbX + 115, tbY + 22, tbX + 115, tbY + 42);
 
+  const tbData = specs.titleBlock || {};
+  const displayTitle = tbData.drawingTitle || model.title;
+  const displayAuthor = tbData.authorName || authorName;
+  const displayTeam = tbData.teamName || specs.teamName || 'MNAnimat AeroSpace';
+  const displayDwg = tbData.drawingNumber || `DWG-${model.id.toUpperCase()}`;
+  const displayScale = tbData.scale || '1:1';
+  const displayDate = tbData.date || new Date().toLocaleDateString('pt-BR');
+  const displayRev = tbData.revision || 'REV 01';
+  const displayMat = tbData.material || specs.material;
+  const displayTol = tbData.tolerance || '± 0.10 mm';
+
   doc.setFontSize(7);
   doc.setTextColor(100, 115, 130);
   doc.text('ORGANIZAÇÃO / EQUIPE:', tbX + 2, tbY + 4);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(specs.teamName || 'MNAnimat AeroSpace', tbX + 2, tbY + 8);
+  doc.text(displayTeam.slice(0, 32), tbX + 2, tbY + 8);
 
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
@@ -296,7 +320,7 @@ export function generateTechnicalDrawingPDF(
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(authorName.slice(0, 30), tbX + 82, tbY + 8);
+  doc.text(displayAuthor.slice(0, 30), tbX + 82, tbY + 8);
 
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
@@ -305,7 +329,7 @@ export function generateTechnicalDrawingPDF(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(220, 38, 38);
-  doc.text(model.title.slice(0, 42), tbX + 2, tbY + 19);
+  doc.text(displayTitle.slice(0, 42), tbX + 2, tbY + 19);
 
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
@@ -314,26 +338,26 @@ export function generateTechnicalDrawingPDF(
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(`DWG-${model.id.toUpperCase()}`, tbX + 82, tbY + 19);
+  doc.text(displayDwg.slice(0, 20), tbX + 82, tbY + 19);
 
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 115, 130);
   doc.text('ESCALA:', tbX + 2, tbY + 26);
-  doc.text('1:1 (mm)', tbX + 2, tbY + 30);
+  doc.text(displayScale, tbX + 2, tbY + 30);
 
-  doc.text('TOLERÂNCIA GERAL:', tbX + 35, tbY + 26);
-  doc.text('± 0.10 mm', tbX + 35, tbY + 30);
+  doc.text('TOLERÂNCIA:', tbX + 35, tbY + 26);
+  doc.text(displayTol, tbX + 35, tbY + 30);
 
   doc.text('DATA:', tbX + 80, tbY + 26);
-  doc.text(new Date().toLocaleDateString('pt-BR'), tbX + 80, tbY + 30);
+  doc.text(displayDate, tbX + 80, tbY + 30);
 
-  doc.text('FOLHA:', tbX + 118, tbY + 26);
-  doc.text('A3 - 1/1', tbX + 118, tbY + 30);
+  doc.text('REVISÃO:', tbX + 118, tbY + 26);
+  doc.text(displayRev, tbX + 118, tbY + 30);
 
-  doc.text('APROVADO POR (RSO):', tbX + 2, tbY + 36);
+  doc.text('MATERIAL / APROVAÇÃO RSO:', tbX + 2, tbY + 36);
   doc.setFont('helvetica', 'bold');
-  doc.text('✓ VALIDAÇÃO TÉCNICA AEROESPACIAL OK', tbX + 2, tbY + 40);
+  doc.text(`${displayMat.slice(0, 40)} - ✓ APROVADO ISO 128`, tbX + 2, tbY + 40);
 
   // Save File
   const filename = `${model.title.replace(/\s+/g, '_')}_Desenho_Tecnico_A3.pdf`;

@@ -28,31 +28,38 @@ import {
   Maximize2,
   X
 } from 'lucide-react';
+import { getStoredFlightParams, saveStoredFlightParams } from '../utils/offlineCache';
+
+const DEFAULT_FLIGHT_PARAMS: RocketParams = {
+  massInitial: 1.45, // kg total wet mass
+  massFinal: 0.95, // kg dry mass without propellant
+  motorThrust: 210, // N peak thrust
+  motorImpulse: 260, // N*s total impulse (Class G/H motor)
+  burnTime: 2.3, // s burn time
+  diameter: 0.082, // m (82mm caliber)
+  cd: 0.42, // Base subsonic drag coefficient Cd0
+  launchAngle: 86, // degrees
+  railLength: 2.5, // m launch rail length
+  windSpeed: 14, // km/h ground wind
+  windDirection: 90, // degrees
+  temperatureGround: 25, // °C
+  pressureGround: 1013.25, // hPa
+  cgPosition: 44, // cm from nosecone tip
+  cpPosition: 62, // cm from nosecone tip
+  drogueDiameter: 0.35, // m drogue chute diameter
+  drogueCd: 1.5, // drogue chute drag coefficient
+  mainDeployAlt: 150, // m main deployment altitude
+  mainDiameter: 1.15, // m main chute diameter
+  mainCd: 2.2 // main chute drag coefficient
+};
 
 export const FlightSimulator: React.FC = () => {
-  // Rocket Parameters State with High-Precision Recovery & Atmosphere Defaults
-  const [params, setParams] = useState<RocketParams>({
-    massInitial: 1.45, // kg total wet mass
-    massFinal: 0.95, // kg dry mass without propellant
-    motorThrust: 210, // N peak thrust
-    motorImpulse: 260, // N*s total impulse (Class G/H motor)
-    burnTime: 2.3, // s burn time
-    diameter: 0.082, // m (82mm caliber)
-    cd: 0.42, // Base subsonic drag coefficient Cd0
-    launchAngle: 86, // degrees
-    railLength: 2.5, // m launch rail length
-    windSpeed: 14, // km/h ground wind
-    windDirection: 90, // degrees
-    temperatureGround: 25, // °C
-    pressureGround: 1013.25, // hPa
-    cgPosition: 44, // cm from nosecone tip
-    cpPosition: 62, // cm from nosecone tip
-    drogueDiameter: 0.35, // m drogue chute diameter
-    drogueCd: 1.5, // drogue chute drag coefficient
-    mainDeployAlt: 150, // m main deployment altitude
-    mainDiameter: 1.15, // m main chute diameter
-    mainCd: 2.2 // main chute drag coefficient
-  });
+  // Rocket Parameters State with High-Precision Recovery & Atmosphere Defaults cached in localStorage
+  const [params, setParams] = React.useState<RocketParams>(() => getStoredFlightParams(DEFAULT_FLIGHT_PARAMS));
+
+  React.useEffect(() => {
+    saveStoredFlightParams(params);
+  }, [params]);
 
   const [activeSubTab, setActiveSubTab] = useState<'sim' | 'params' | 'formulas'>('sim');
   const [isPlaying, setIsPlaying] = useState(false);

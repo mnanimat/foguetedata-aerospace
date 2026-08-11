@@ -29,6 +29,7 @@ interface NavbarProps {
   currentUser: User | null;
   onOpenAuthModal: () => void;
   onLogout: () => void;
+  onStartWalkthrough?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,7 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   currentUser,
   onOpenAuthModal,
-  onLogout
+  onLogout,
+  onStartWalkthrough
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -117,8 +119,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             <RocketAudioPlayer embedded />
           </div>
 
-          {/* Theme Switcher & User Status */}
+          {/* Theme Switcher & Tour & User Status */}
           <div className="flex items-center gap-2.5">
+            {/* Tour Guiado Button */}
+            {onStartWalkthrough && (
+              <button
+                onClick={onStartWalkthrough}
+                className="px-2.5 py-1.5 rounded-md transition border border-red-500/50 bg-red-950/40 hover:bg-red-900/60 text-red-300 hover:text-white flex items-center gap-1.5 text-xs font-mono font-bold shadow-sm"
+                title="Iniciar Tour Guiado do Sistema"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Tour Guiado</span>
+              </button>
+            )}
+
             {/* Light/Dark Mode Switcher */}
             <button
               onClick={toggleTheme}

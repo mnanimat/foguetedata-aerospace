@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActiveTab, User } from './types';
 import { Navbar } from './components/Navbar';
+import { OfflineCacheBanner } from './components/OfflineCacheBanner';
 import { FlightSimulator } from './components/FlightSimulator';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { SubsystemsDetail } from './components/SubsystemsDetail';
@@ -10,18 +11,25 @@ import { User3DModelStudio } from './components/User3DModelStudio';
 import { CadRepository } from './components/CadRepository';
 import { LegalAndReferences } from './components/LegalAndReferences';
 import { AuthModal } from './components/AuthModal';
+import { InteractiveWalkthrough } from './components/InteractiveWalkthrough';
 import { FallingRocketryRain } from './components/FallingRocketryRain';
 import { RocketAudioPlayer } from './components/RocketAudioPlayer';
 import { EXTERNAL_LINKS } from './data/knowledgeData';
 import { ExternalLink, Layers, Box, Sparkles, Heart, Mail } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
+import { getStoredUserSession, saveStoredUserSession } from './utils/offlineCache';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('trajectory');
-  const [isAuthOpen, setIsAuthOpen] = useState(true);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false);
 
-  // Default Authenticated User State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Authenticated User State with localStorage persistence
+  const [currentUser, setCurrentUser] = useState<User | null>(() => getStoredUserSession());
+
+  useEffect(() => {
+    saveStoredUserSession(currentUser);
+  }, [currentUser]);
 
   return (
     <ThemeProvider>
@@ -34,7 +42,11 @@ export default function App() {
           currentUser={currentUser}
           onOpenAuthModal={() => setIsAuthOpen(true)}
           onLogout={() => setCurrentUser(null)}
+          onStartWalkthrough={() => setIsWalkthroughOpen(true)}
         />
+
+        {/* Persistent Offline Cache Status Banner */}
+        <OfflineCacheBanner />
 
         {/* Main Page Body Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-5 lg:px-6 py-5 space-y-6">
@@ -69,6 +81,7 @@ export default function App() {
             <User3DModelStudio
               currentUser={currentUser}
               onOpenAuthModal={() => setIsAuthOpen(true)}
+              onStartWalkthrough={() => setIsWalkthroughOpen(true)}
             />
           )}
 
@@ -83,6 +96,13 @@ export default function App() {
           {/* Tab 8: Legal Terms, MIT License & References */}
           {activeTab === 'legal' && <LegalAndReferences />}
         </main>
+
+        {/* Interactive Walkthrough Tour */}
+        <InteractiveWalkthrough
+          isOpen={isWalkthroughOpen}
+          onClose={() => setIsWalkthroughOpen(false)}
+          onNavigateTab={(tab) => setActiveTab(tab)}
+        />
 
         {/* Auth / Login Modal */}
         <AuthModal

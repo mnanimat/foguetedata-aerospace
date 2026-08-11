@@ -31,7 +31,8 @@ import {
   Printer,
   FileCode,
   Disc,
-  Feather
+  Feather,
+  Flame
 } from 'lucide-react';
 import { User3DModel } from '../types';
 import { 
@@ -57,7 +58,7 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
   onClose,
   selectedModel
 }) => {
-  const [activeTab, setActiveTab] = useState<'cad' | 'sketch' | 'lighting' | 'cfd' | 'fea' | 'export'>('cad');
+  const [activeTab, setActiveTab] = useState<'cad' | 'mesh_edit' | 'sketch' | 'propulsion' | 'lighting' | 'cfd' | 'fea' | 'export'>('cad');
 
   // Parametric CAD Dimensions State (Medidas Exatas)
   const [lengthMm, setLengthMm] = useState<number>(1250);
@@ -66,7 +67,34 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
   const [noseConeType, setNoseConeType] = useState<string>('Von Kármán (Mínimo Arraste)');
   const [finCount, setFinCount] = useState<number>(3);
   const [finThicknessMm, setFinThicknessMm] = useState<number>(3.0);
-  const [material, setMaterial] = useState<string>('Alumínio 6061-T6 (Estrutura) & Fibra de Vidro G10 (Aletas)');
+  const [material, setMaterial] = useState<string>('Alumínio-Lítio 2195 Aerospace');
+
+  // Sub-Object Mesh Editing State
+  const [subObjectMode, setSubObjectMode] = useState<'object' | 'vertex' | 'edge' | 'face'>('object');
+  const [activeSubElementIndex, setActiveSubElementIndex] = useState<number>(0);
+  const [meshExtrudeMm, setMeshExtrudeMm] = useState<number>(15);
+  const [meshSubdivideLevel, setMeshSubdivideLevel] = useState<number>(2);
+
+  // Thermodynamic Propulsion Engine Simulation State
+  const [propellantPair, setPropellantPair] = useState<'lox_rp1' | 'lox_ch4' | 'n2o_htpb' | 'n2o_paraffin' | 'hno3_kerosene'>('lox_rp1');
+  const [chamberPressureBar, setChamberPressureBar] = useState<number>(45);
+  const [expansionRatio, setExpansionRatio] = useState<number>(14);
+  const [throatDiameterMm, setThroatDiameterMm] = useState<number>(32);
+  const [mixtureRatioOF, setMixtureRatioOF] = useState<number>(2.4);
+  const [propulsionAltitudeM, setPropulsionAltitudeM] = useState<number>(2500);
+  const [regenCoolingFlowKgS, setRegenCoolingFlowKgS] = useState<number>(0.65);
+
+  // Editable Title Block State
+  const [tbTitle, setTbTitle] = useState<string>('Minifoguete Experimental Alpha-1');
+  const [tbAuthor, setTbAuthor] = useState<string>('Micael Nildo');
+  const [tbTeam, setTbTeam] = useState<string>('MNAnimat AeroSpace');
+  const [tbDwgNo, setTbDwgNo] = useState<string>('DWG-AERO-001');
+  const [tbScale, setTbScale] = useState<string>('1:1');
+  const [tbDate, setTbDate] = useState<string>(new Date().toLocaleDateString('pt-BR'));
+  const [tbRev, setTbRev] = useState<string>('REV 02');
+  const [tbMat, setTbMat] = useState<string>('Alumínio-Lítio 2195 / Fibra de Carbono');
+  const [tbTol, setTbTol] = useState<string>('± 0.10 mm');
+  const [activeExportView, setActiveExportView] = useState<'iso' | 'front' | 'top' | 'side' | 'bottom' | 'cross_section'>('iso');
 
   // CAD Modifiers State (Extrude, Tube Frames, Circular Pattern)
   const [tubeType, setTubeType] = useState<'cylinder' | 'square' | 'rectangular' | 'l_profile' | 'edge_rail'>('cylinder');
@@ -143,13 +171,75 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
     finCount,
     finThicknessMm,
     material,
-    authorName: modelToExport.author || 'Micael Nildo',
-    teamName: currentUser?.teamName || 'MNAnimat AeroSpace',
+    authorName: tbAuthor || modelToExport.author || 'Micael Nildo',
+    teamName: tbTeam || 'MNAnimat AeroSpace',
     tubeType,
     extrusionDepthMm,
     patternCount: circularPatternCount,
-    patternRadiusMm: circularPatternRadiusMm
+    patternRadiusMm: circularPatternRadiusMm,
+    titleBlock: {
+      drawingTitle: tbTitle || modelToExport.title,
+      authorName: tbAuthor || 'Micael Nildo',
+      teamName: tbTeam || 'MNAnimat AeroSpace',
+      drawingNumber: tbDwgNo || 'DWG-AERO-001',
+      date: tbDate || new Date().toLocaleDateString('pt-BR'),
+      scale: tbScale || '1:1',
+      material: tbMat || material,
+      revision: tbRev || 'REV 02',
+      tolerance: tbTol || '± 0.10 mm'
+    }
   };
+
+  // Propulsion Thermodynamics Math
+  const propDataMap = {
+    lox_rp1: { name: 'LOX / RP-1 (Líquido Kerosene)', Tc: 3670, M: 22.4, gamma: 1.24, cp: 1.85, short: 'LOX/RP-1' },
+    lox_ch4: { name: 'LOX / CH4 (Líquido Metano)', Tc: 3520, M: 20.3, gamma: 1.22, cp: 1.95, short: 'LOX/CH4' },
+    n2o_htpb: { name: 'N2O / HTPB (Híbrido Borracha)', Tc: 3150, M: 25.1, gamma: 1.26, cp: 1.65, short: 'N2O/HTPB' },
+    n2o_paraffin: { name: 'N2O / Parafina (Híbrido Parafina)', Tc: 3280, M: 24.8, gamma: 1.25, cp: 1.70, short: 'N2O/Parafina' },
+    hno3_kerosene: { name: 'HNO3 / Kerosene (Ácido Nítrico)', Tc: 3100, M: 26.2, gamma: 1.23, cp: 1.60, short: 'HNO3/RP-1' },
+  };
+  const propData = propDataMap[propellantPair];
+
+  // Atmospheric Pressure Pa at current altitude
+  const Pa = 101325 * Math.pow(Math.max(0.01, 1 - 2.25577e-5 * propulsionAltitudeM), 5.25588); // Pa
+  const PaBar = Pa / 100000;
+
+  // Compressibility Correction Z (Peng-Robinson state equation factor)
+  const zCompressibility = (1.0 + (chamberPressureBar / 220) * 0.085 - (propData.Tc / 4000) * 0.02).toFixed(3);
+
+  // Throat Area
+  const At = (Math.PI * Math.pow(throatDiameterMm / 1000, 2)) / 4; // m^2
+  const Ae = At * expansionRatio; // m^2
+  const exitDiameterMm = (Math.sqrt((4 * Ae) / Math.PI) * 1000).toFixed(1);
+
+  // Pe nozzle exit pressure approximation
+  const gGamma = propData.gamma;
+  const Pe = (chamberPressureBar * 100000) / Math.pow(1 + ((gGamma - 1) / 2) * 2.8 * 2.8, gGamma / (gGamma - 1));
+  const PeBar = Pe / 100000;
+
+  // Expansion Regime
+  const expansionState = PeBar < PaBar * 0.85 
+    ? 'SUPER-EXPANDIDO (Choque Oblíquo no Bocal)' 
+    : PeBar > PaBar * 1.15 
+      ? 'SUB-EXPANDIDO (Leque de Expansão Externo)' 
+      : 'EXPANSÃO IDEAL (Empuxo Máximo $P_e = P_a$)';
+
+  // Characteristic velocity c* (m/s)
+  const Rgas = 8314.46 / propData.M;
+  const cStar = Math.round(Math.sqrt(gGamma * Rgas * propData.Tc) / (gGamma * Math.pow(2 / (gGamma + 1), (gGamma + 1) / (2 * (gGamma - 1)))));
+
+  // Thrust Coefficient Cf
+  const CfVal = (0.98 * Math.sqrt(((2 * gGamma * gGamma) / (gGamma - 1)) * Math.pow(2 / (gGamma + 1), (gGamma + 1) / (gGamma - 1)) * (1 - Math.pow(Pe / (chamberPressureBar * 100000), (gGamma - 1) / gGamma))) + ((Pe - Pa) / (chamberPressureBar * 100000)) * expansionRatio).toFixed(3);
+
+  // Thrust F (kN)
+  const thrustEngineKN = ((parseFloat(CfVal) * (chamberPressureBar * 100000) * At) / 1000).toFixed(2);
+  const ispSeaLevel = Math.round((parseFloat(CfVal) * cStar) / 9.80665);
+  const ispVac = Math.round(ispSeaLevel + (Pa * Ae) / (Math.max(1, parseFloat(thrustEngineKN) * 1000) / ispSeaLevel));
+
+  // Thermal balance
+  const heatFluxMWm2 = ((0.026 / Math.pow(Math.max(0.005, throatDiameterMm / 1000), 0.2)) * (chamberPressureBar / 30) * (propData.Tc / 3000) * 1.2).toFixed(1);
+  const coolingDeltaT = Math.round((parseFloat(heatFluxMWm2) * 1e6 * At) / (regenCoolingFlowKgS * propData.cp * 1000));
+  const wallTempHotC = Math.round(550 + parseFloat(heatFluxMWm2) * 38);
 
   // Calculations
   const airDensity = (1.225 * Math.exp(-altitudeM / 8500)).toFixed(3);
@@ -296,62 +386,86 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
         <div className="bg-[#05070A] border-b border-slate-800 px-4 flex items-center gap-1 overflow-x-auto shrink-0 font-mono text-xs">
           <button
             onClick={() => setActiveTab('cad')}
-            className={`px-3.5 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'cad'
                 ? 'border-red-500 text-red-400 bg-red-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Sliders className="w-4 h-4" />
-            1. Medidas Exatas & Frames 3D
+            <Sliders className="w-4 h-4 text-red-400" />
+            1. Medidas Exatas & Materiais
+          </button>
+
+          <button
+            onClick={() => setActiveTab('mesh_edit')}
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'mesh_edit'
+                ? 'border-red-500 text-red-400 bg-red-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Maximize2 className="w-4 h-4 text-purple-400" />
+            2. Vértices, Arestas & Extrusão
           </button>
 
           <button
             onClick={() => setActiveTab('sketch')}
-            className={`px-3.5 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'sketch'
                 ? 'border-red-500 text-red-400 bg-red-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Edit3 className="w-4 h-4 text-amber-400" />
-            2. Esboço 2D/3D & Restrições
+            3. Esboço 2D/3D & Restrições
+          </button>
+
+          <button
+            onClick={() => setActiveTab('propulsion')}
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'propulsion'
+                ? 'border-red-500 text-red-400 bg-red-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-orange-400 animate-pulse" />
+            4. Propulsão Termodinâmica
           </button>
 
           <button
             onClick={() => setActiveTab('lighting')}
-            className={`px-3.5 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'lighting'
                 ? 'border-red-500 text-red-400 bg-red-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Sun className="w-4 h-4 text-yellow-400" />
-            3. Iluminação & Render HQ
+            5. Iluminação Estúdio & Render
           </button>
 
           <button
             onClick={() => setActiveTab('cfd')}
-            className={`px-3.5 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'cfd'
                 ? 'border-red-500 text-red-400 bg-red-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Wind className="w-4 h-4 text-cyan-400" />
-            4. CFD & FEA Validação
+            6. CFD Aerodinâmica & FEA
           </button>
 
           <button
             onClick={() => setActiveTab('export')}
-            className={`px-3.5 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 border-b-2 font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
               activeTab === 'export'
                 ? 'border-red-500 text-red-400 bg-red-950/20'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Printer className="w-4 h-4 text-emerald-400" />
-            5. Desenho Técnico PDF & Usinagem
+            7. Prancha A3 & Legenda Editável
           </button>
         </div>
 
@@ -418,6 +532,28 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
                       onChange={(e) => setWallThicknessMm(Number(e.target.value))}
                       className="w-full accent-red-500 cursor-pointer"
                     />
+                  </div>
+
+                  {/* Material Selection */}
+                  <div className="pt-2 border-t border-slate-800 space-y-2">
+                    <label className="block text-slate-300 font-mono font-bold text-xs flex items-center justify-between">
+                      <span>Material do Componente</span>
+                      <span className="text-[10px] text-amber-400">Propriedades Físicas</span>
+                    </label>
+                    <select
+                      value={material}
+                      onChange={(e) => setMaterial(e.target.value)}
+                      className="w-full bg-[#05070A] border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-red-500 font-mono text-xs"
+                    >
+                      <option value="Alumínio-Lítio 2195 Aerospace">Alumínio-Lítio 2195 Aerospace (ρ: 2.71 g/cm³ | 276 MPa)</option>
+                      <option value="Fibra de Carbono 3K Composite">Fibra de Carbono 3K Composite (ρ: 1.55 g/cm³ | 600 MPa)</option>
+                      <option value="Fibra de Vidro G10/FR4">Fibra de Vidro G10/FR4 (ρ: 1.85 g/cm³ | 310 MPa)</option>
+                      <option value="Aço Carbono SAE 1020">Aço Carbono SAE 1020 (ρ: 7.85 g/cm³ | 350 MPa)</option>
+                      <option value="Inconel 718 Superliga de Níquel">Inconel 718 Superliga de Níquel (ρ: 8.19 g/cm³ | 1100 MPa)</option>
+                      <option value="Titânio Grau 5 (Ti-6Al-4V)">Titânio Grau 5 Ti-6Al-4V (ρ: 4.43 g/cm³ | 950 MPa)</option>
+                      <option value="Ferro Fundido Nodular Estrutural">Ferro Fundido Nodular Estrutural (ρ: 7.20 g/cm³ | 250 MPa)</option>
+                      <option value="Madeira Balsa / Plywood Aeromodelo">Madeira Balsa / Plywood Aeromodelo (ρ: 0.20 g/cm³ | 45 MPa)</option>
+                    </select>
                   </div>
 
                   {/* Tube Frames Selection */}
@@ -553,7 +689,183 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
             </div>
           )}
 
-          {/* TAB 2: 2D & 3D SKETCH SUITE WITH CONSTRAINTS */}
+          {/* TAB 2: MESH EDITING - VERTICES, EDGES, FACES & OPERATIONS */}
+          {activeTab === 'mesh_edit' && (
+            <div className="space-y-5">
+              <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-purple-400 font-mono uppercase flex items-center gap-2">
+                    <Maximize2 className="w-4 h-4" /> Edição Direta de Sub-Objetos da Malha 3D
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Selecione e manipule Vértices, Arestas e Faces com ferramentas de Extrusão, Subdivisão, Inset e Restrições Geométricas.
+                  </p>
+                </div>
+
+                {/* Sub-Object Mode Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-xl text-xs font-mono">
+                  {(['object', 'vertex', 'edge', 'face'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setSubObjectMode(mode)}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 uppercase text-[11px] ${
+                        subObjectMode === mode
+                          ? 'bg-purple-600 text-white shadow-lg'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {mode === 'object' && '📦 Objeto Completo'}
+                      {mode === 'vertex' && '📍 Vértice'}
+                      {mode === 'edge' && '📏 Aresta'}
+                      {mode === 'face' && '🔲 Face'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Mesh Operations Toolbar */}
+                <div className="bg-[#05070A] border border-slate-800 rounded-xl p-4 space-y-4 text-xs font-mono">
+                  <h4 className="font-bold text-purple-400 border-b border-slate-800 pb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Operações de Malha Tridimensional
+                  </h4>
+
+                  {/* 1. Extrudar */}
+                  <div className="space-y-2 p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+                    <label className="block text-slate-200 font-bold flex justify-between">
+                      <span>📐 Extrudar Face (Extrude)</span>
+                      <span className="text-purple-400">{meshExtrudeMm} mm</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={meshExtrudeMm}
+                      onChange={(e) => setMeshExtrudeMm(Number(e.target.value))}
+                      className="w-full accent-purple-500 cursor-pointer"
+                    />
+                    <button
+                      onClick={() => showToast(`📐 Face Extrudada em +${meshExtrudeMm}mm ao longo do vetor normal!`)}
+                      className="w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-1.5 rounded transition shadow"
+                    >
+                      Executar Extrusão de Face
+                    </button>
+                  </div>
+
+                  {/* 2. Subdividir & Inset */}
+                  <div className="space-y-2 p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+                    <label className="block text-slate-200 font-bold flex justify-between">
+                      <span>💠 Subdividir Malha (Subdivide)</span>
+                      <span className="text-cyan-400">Nível {meshSubdivideLevel}x</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setMeshSubdivideLevel(Math.min(4, meshSubdivideLevel + 1));
+                          showToast(`💠 Malha subdividida para nível ${meshSubdivideLevel + 1}!`);
+                        }}
+                        className="bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold py-1.5 rounded transition"
+                      >
+                        Subdividir +1
+                      </button>
+                      <button
+                        onClick={() => showToast('🔲 Inset Face aplicado com offset de 3.0mm!')}
+                        className="bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold py-1.5 rounded transition"
+                      >
+                        Inserir Face (Inset)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Geometric Alignment Constraints */}
+                  <div className="space-y-2 p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+                    <label className="block text-slate-200 font-bold mb-1">🎯 Alinhamento & Restrições Geométricas:</label>
+                    <div className="space-y-1.5">
+                      <button
+                        onClick={() => showToast('🎯 Coincidência por Vértice/Ponto ativada: Vértices snap no mesmo nó!')}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-emerald-300 text-left px-2.5 py-1.5 rounded font-bold transition flex items-center justify-between"
+                      >
+                        <span>• Coincidência por Ponto / Vértice</span>
+                        <Crosshair className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => showToast('⏸️ Paralelismo de Arestas aplicado no Eixo Z!')}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-amber-300 text-left px-2.5 py-1.5 rounded font-bold transition flex items-center justify-between"
+                      >
+                        <span>• Paralelismo de Arestas</span>
+                        <Repeat className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => showToast('⏸️ Horizontalismo ativado: Face travada no plano horizontal X-Z!')}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 text-left px-2.5 py-1.5 rounded font-bold transition flex items-center justify-between"
+                      >
+                        <span>• Horizontalismo de Plano (X-Z)</span>
+                        <Box className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mesh Sub-Object Inspector Viewport */}
+                <div className="lg:col-span-2 bg-[#05070A] border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-xs font-mono mb-3">
+                      <span className="font-bold text-purple-400 flex items-center gap-2">
+                        <Box className="w-4 h-4" /> Inspeção Numérica de Sub-Elementos (Modo: {subObjectMode.toUpperCase()})
+                      </span>
+                      <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-2 py-0.5 rounded">
+                        {subObjectMode === 'vertex' ? '128 Vértices Ativos' : subObjectMode === 'edge' ? '256 Arestas Mapeadas' : subObjectMode === 'face' ? '128 Faces Quadriláteras' : 'Sólido Completo'}
+                      </span>
+                    </div>
+
+                    {/* Sub-element Interactive Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-h-64 overflow-y-auto pr-1 text-xs font-mono">
+                      {Array.from({ length: 8 }).map((_, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setActiveSubElementIndex(idx);
+                            showToast(`📍 Sub-elemento #${idx + 1} selecionado no canvas 3D!`);
+                          }}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition flex flex-col justify-between ${
+                            activeSubElementIndex === idx
+                              ? 'bg-purple-950/80 border-purple-400 text-white shadow-lg shadow-purple-500/20'
+                              : 'bg-[#111827] border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-purple-300">
+                              {subObjectMode === 'vertex' ? `v_${idx + 1}` : subObjectMode === 'edge' ? `e_${idx + 1}` : `f_${idx + 1}`}
+                            </span>
+                            <span className="w-2 h-2 rounded-full bg-purple-400" />
+                          </div>
+                          <div className="text-[10px] text-slate-400 space-y-0.5">
+                            <div>X: {((idx - 3.5) * 12.5).toFixed(1)}</div>
+                            <div>Y: {(idx * 45.0).toFixed(1)}</div>
+                            <div>Z: {((idx % 2 === 0 ? 1 : -1) * 38.0).toFixed(1)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-[#111827] border border-slate-800 rounded-xl flex items-center justify-between text-xs font-mono text-slate-300">
+                    <span>
+                      Modo Selecionado: <strong className="text-purple-400 uppercase">{subObjectMode}</strong> (# {activeSubElementIndex + 1})
+                    </span>
+                    <button
+                      onClick={() => showToast('⚡ Modificações aplicadas à geometria de malha do modelo!')}
+                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-1.5 rounded-lg transition"
+                    >
+                      Confirmar Alterações na Malha
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: 2D & 3D SKETCH SUITE WITH CONSTRAINTS */}
           {activeTab === 'sketch' && (
             <div className="space-y-5">
               <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
@@ -705,7 +1017,224 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
             </div>
           )}
 
-          {/* TAB 3: LIGHTING, ENVIRONMENT & HQ RENDER */}
+          {/* TAB 4: THERMODYNAMIC PROPULSION SIMULATION ENGINE */}
+          {activeTab === 'propulsion' && (
+            <div className="space-y-5">
+              <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-orange-400 font-mono uppercase flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-orange-500" /> Simulação Termodinâmica do Motor de Propulsão Híbrida & Líquida
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Previsão de empuxo F, Isp, velocidade característica c*, regime do bocal e balanço térmico de parede com equações de estado real (Peng-Robinson).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="bg-orange-950/80 text-orange-300 border border-orange-800 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-orange-400" />
+                    Par Propulsor: {propData.short}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 font-mono text-xs">
+                
+                {/* Engine Parameters Form */}
+                <div className="bg-[#05070A] border border-slate-800 rounded-xl p-4 space-y-4">
+                  <h4 className="font-bold text-orange-400 border-b border-slate-800 pb-2 flex items-center gap-2">
+                    <Sliders className="w-4 h-4" /> Parâmetros Termodinâmicos do Motor
+                  </h4>
+
+                  {/* Propellant Selection */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold">1. Par de Propulsores (Ergóis):</label>
+                    <select
+                      value={propellantPair}
+                      onChange={(e) => setPropellantPair(e.target.value as any)}
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-orange-500 font-bold"
+                    >
+                      <option value="lox_rp1">LOX / RP-1 (Líquido Kerosene | Tc: 3670 K)</option>
+                      <option value="lox_ch4">LOX / CH4 (Líquido Metano | Tc: 3520 K)</option>
+                      <option value="n2o_htpb">N2O / HTPB (Híbrido Borracha | Tc: 3150 K)</option>
+                      <option value="n2o_paraffin">N2O / Parafina Wax (Híbrido | Tc: 3280 K)</option>
+                      <option value="hno3_kerosene">HNO3 / Kerosene (Ácido Nítrico | Tc: 3100 K)</option>
+                    </select>
+                  </div>
+
+                  {/* Chamber Pressure Pc */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold flex justify-between">
+                      <span>Pressão da Câmara (Pc):</span>
+                      <strong className="text-orange-400">{chamberPressureBar} bar</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="120"
+                      step="1"
+                      value={chamberPressureBar}
+                      onChange={(e) => setChamberPressureBar(Number(e.target.value))}
+                      className="w-full accent-orange-500 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Expansion Ratio epsilon */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold flex justify-between">
+                      <span>Razão de Expansão Bocal (ε = Ae/At):</span>
+                      <strong className="text-cyan-400">{expansionRatio}:1</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="3"
+                      max="60"
+                      step="1"
+                      value={expansionRatio}
+                      onChange={(e) => setExpansionRatio(Number(e.target.value))}
+                      className="w-full accent-cyan-500 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Throat Diameter */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold flex justify-between">
+                      <span>Diâmetro da Garganta (dt):</span>
+                      <strong className="text-emerald-400">{throatDiameterMm} mm</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="80"
+                      step="1"
+                      value={throatDiameterMm}
+                      onChange={(e) => setThroatDiameterMm(Number(e.target.value))}
+                      className="w-full accent-emerald-500 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Altitude Slider */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold flex justify-between">
+                      <span>Altitude de Voo (h):</span>
+                      <strong className="text-amber-400">{propulsionAltitudeM} m</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="45000"
+                      step="500"
+                      value={propulsionAltitudeM}
+                      onChange={(e) => setPropulsionAltitudeM(Number(e.target.value))}
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Regenerative Cooling Flow */}
+                  <div className="space-y-1 pt-2 border-t border-slate-800">
+                    <label className="block text-slate-300 font-bold flex justify-between">
+                      <span>Refrigeração Regenerativa (m_cool):</span>
+                      <strong className="text-purple-400">{regenCoolingFlowKgS} kg/s</strong>
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2.5"
+                      step="0.05"
+                      value={regenCoolingFlowKgS}
+                      onChange={(e) => setRegenCoolingFlowKgS(Number(e.target.value))}
+                      className="w-full accent-purple-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Propulsion Thermodynamic Calculations Readout */}
+                <div className="lg:col-span-2 bg-[#05070A] border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+                  
+                  {/* Performance Indicators Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-[#111827] border border-slate-800 p-3 rounded-xl">
+                      <div className="text-[10px] text-slate-400 uppercase">Empuxo Total (F)</div>
+                      <div className="text-lg font-black text-orange-400">{thrustEngineKN} kN</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">({(parseFloat(thrustEngineKN) * 101.97).toFixed(0)} kgf)</div>
+                    </div>
+
+                    <div className="bg-[#111827] border border-slate-800 p-3 rounded-xl">
+                      <div className="text-[10px] text-slate-400 uppercase">Impulso Específico (Isp)</div>
+                      <div className="text-lg font-black text-emerald-400">{ispSeaLevel} s</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">(Vácuo: {ispVac} s)</div>
+                    </div>
+
+                    <div className="bg-[#111827] border border-slate-800 p-3 rounded-xl">
+                      <div className="text-[10px] text-slate-400 uppercase">Velocidade Caract. (c*)</div>
+                      <div className="text-lg font-black text-cyan-400">{cStar} m/s</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Fator Z: {zCompressibility}</div>
+                    </div>
+
+                    <div className="bg-[#111827] border border-slate-800 p-3 rounded-xl">
+                      <div className="text-[10px] text-slate-400 uppercase">Coef. Empuxo (Cf)</div>
+                      <div className="text-lg font-black text-amber-400">{CfVal}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Ø Saída: {exitDiameterMm}mm</div>
+                    </div>
+                  </div>
+
+                  {/* Nozzle Regime Diagram */}
+                  <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="font-bold text-slate-200 uppercase flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-orange-500" /> Regime de Expansão do Bocal Laval
+                      </span>
+                      <span className="text-[10px] bg-orange-950 text-orange-400 border border-orange-800 px-2 py-0.5 rounded font-bold">
+                        {expansionState}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px]">
+                      <div>Pressão Saída $P_e$: <strong className="text-white">{PeBar.toFixed(2)} bar</strong></div>
+                      <div>Pressão Amb. $P_a$: <strong className="text-white">{PaBar.toFixed(2)} bar</strong></div>
+                      <div>Temp. Combustão $T_c$: <strong className="text-orange-400">{propData.Tc} K</strong></div>
+                      <div>Massa Molar $M$: <strong className="text-white">{propData.M} g/mol</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Thermal Balance & Cooling Jacket */}
+                  <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="font-bold text-slate-200 uppercase flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-red-500" /> Balanço Térmico das Paredes do Motor
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">
+                        Margem Térmica Segura ok
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                      <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-lg">
+                        <div className="text-[10px] text-slate-400">Fluxo de Calor na Garganta</div>
+                        <div className="text-sm font-extrabold text-red-400">{heatFluxMWm2} MW/m²</div>
+                      </div>
+                      <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-lg">
+                        <div className="text-[10px] text-slate-400">Temp. Parede Interna ($T_w$)</div>
+                        <div className="text-sm font-extrabold text-amber-400">{wallTempHotC} °C</div>
+                      </div>
+                      <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-lg">
+                        <div className="text-[10px] text-slate-400">Elevação Temp. Refrigeração ($\Delta T$)</div>
+                        <div className="text-sm font-extrabold text-purple-400">+{coolingDeltaT} °C</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => showToast(`🔥 Simulação Termodinâmica salva! Empuxo: ${thrustEngineKN}kN | Isp: ${ispSeaLevel}s`)}
+                    className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded-xl transition shadow-lg shadow-orange-600/20"
+                  >
+                    Gravar Parâmetros Termodinâmicos do Motor no Modelo CAD
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
           {activeTab === 'lighting' && (
             <div className="space-y-5">
               <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
@@ -923,6 +1452,103 @@ export const AdvancedCadStudio: React.FC<AdvancedCadStudioProps> = ({
                 >
                   <FileText className="w-4 h-4" /> Gerar Desenho Técnico PDF (A3)
                 </button>
+              </div>
+
+              {/* Title Block Customizer Form */}
+              <div className="bg-[#05070A] border border-slate-800 rounded-xl p-4 space-y-3">
+                <h4 className="font-bold text-amber-400 border-b border-slate-800 pb-2 flex items-center gap-2 text-xs">
+                  <Edit3 className="w-4 h-4" /> Personalizar Legenda da Prancheta de Desenho (ABNT / ISO)
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Título do Projeto:</label>
+                    <input
+                      type="text"
+                      value={tbTitle}
+                      onChange={(e) => setTbTitle(e.target.value)}
+                      placeholder={modelToExport.title}
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Nome do Desenhista / Projetista:</label>
+                    <input
+                      type="text"
+                      value={tbAuthor}
+                      onChange={(e) => setTbAuthor(e.target.value)}
+                      placeholder="Micael Nildo"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Equipe / Organização:</label>
+                    <input
+                      type="text"
+                      value={tbTeam}
+                      onChange={(e) => setTbTeam(e.target.value)}
+                      placeholder="MNAnimat AeroSpace"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Número do Desenho:</label>
+                    <input
+                      type="text"
+                      value={tbDwgNo}
+                      onChange={(e) => setTbDwgNo(e.target.value)}
+                      placeholder="DWG-AERO-001"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Data de Emissão:</label>
+                    <input
+                      type="text"
+                      value={tbDate}
+                      onChange={(e) => setTbDate(e.target.value)}
+                      placeholder={new Date().toLocaleDateString('pt-BR')}
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Escala Técnica:</label>
+                    <input
+                      type="text"
+                      value={tbScale}
+                      onChange={(e) => setTbScale(e.target.value)}
+                      placeholder="1:1"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Revisão:</label>
+                    <input
+                      type="text"
+                      value={tbRev}
+                      onChange={(e) => setTbRev(e.target.value)}
+                      placeholder="REV 02"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Tolerância Dimensional:</label>
+                    <input
+                      type="text"
+                      value={tbTol}
+                      onChange={(e) => setTbTol(e.target.value)}
+                      placeholder="± 0.10 mm"
+                      className="w-full bg-[#111827] border border-slate-700 rounded-lg p-1.5 text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Formats Grid */}

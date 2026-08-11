@@ -59,10 +59,12 @@ import {
   generateGCodeContent, 
   triggerFileDownload 
 } from '../utils/cadExportUtils';
+import { getStoredModels, saveStoredModels } from '../utils/offlineCache';
 
 interface User3DModelStudioProps {
   currentUser: User | null;
   onOpenAuthModal: () => void;
+  onStartWalkthrough?: () => void;
 }
 
 interface TransformHistoryState {
@@ -266,10 +268,19 @@ const createMeshForModel = (model: User3DModel, customGeo?: THREE.BufferGeometry
 
 export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   currentUser,
-  onOpenAuthModal
+  onOpenAuthModal,
+  onStartWalkthrough
 }) => {
-  const [models, setModels] = useState<User3DModel[]>(INITIAL_MODELS);
-  const [selectedModelId, setSelectedModelId] = useState<string>(INITIAL_MODELS[0].id);
+  const [models, setModels] = useState<User3DModel[]>(() => getStoredModels(INITIAL_MODELS));
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => {
+    const loaded = getStoredModels(INITIAL_MODELS);
+    return loaded[0]?.id || 'm1';
+  });
+
+  // Automatically cache models to localStorage on every change
+  useEffect(() => {
+    saveStoredModels(models);
+  }, [models]);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeGizmoTool, setActiveGizmoTool] = useState<'move' | 'rotate' | 'scale'>('move');
 
@@ -287,7 +298,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   const [isAdvancedCadOpen, setIsAdvancedCadOpen] = useState(false);
 
   // Floating In-Viewport CAD HUD State
-  const [activeViewportCadTab, setActiveViewportCadTab] = useState<'none' | 'measures' | 'sketch' | 'lighting' | 'export'>('none');
+  const [activeViewportCadTab, setActiveViewportCadTab] = useState<'none' | 'measures' | 'mesh_edit' | 'sketch' | 'propulsion' | 'lighting' | 'export'>('none');
   const [hudLengthMm, setHudLengthMm] = useState<number>(1250);
   const [hudDiameterMm, setHudDiameterMm] = useState<number>(76);
   const [hudWallThicknessMm, setHudWallThicknessMm] = useState<number>(3.0);
@@ -299,10 +310,176 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   const [hudConstraint, setHudConstraint] = useState<'coincident' | 'parallel'>('coincident');
   const [hudKeyLight, setHudKeyLight] = useState<number>(2.5);
 
+  // Mesh Edit Sub-Object States in HUD
+  const [subObjectMode, setSubObjectMode] = useState<'object' | 'vertex' | 'edge' | 'face'>('object');
+  const [meshExtrudeMm, setMeshExtrudeMm] = useState<number>(25);
+  const [meshSubdivideLevel, setMeshSubdivideLevel] = useState<number>(1);
+  const [activeSubElementIndex, setActiveSubElementIndex] = useState<number>(0);
+
+  // Propulsion Thermodynamics States in HUD
+  const [propellantPair, setPropellantPair] = useState<'lox_rp1' | 'lox_ch4' | 'n2o_htpb' | 'n2o_paraffin' | 'hno3_kerosene'>('lox_rp1');
+  const [chamberPressureBar, setChamberPressureBar] = useState<number>(35);
+  const [expansionRatio, setExpansionRatio] = useState<number>(12);
+  const [throatDiameterMm, setThroatDiameterMm] = useState<number>(28);
+  const [propulsionAltitudeM, setPropulsionAltitudeM] = useState<number>(0);
+  const [regenCoolingFlowKgS, setRegenCoolingFlowKgS] = useState<number>(0.85);
+
   const [sketchLines, setSketchLines] = useState<number[][][]>([]);
   const [sketchStartPoint, setSketchStartPoint] = useState<{x: number, y: number, z: number} | null>(null);
   const [sketchMeasure, setSketchMeasure] = useState<string>('');
   const [sketchAngle, setSketchAngle] = useState<string>('');
+  const [sketchRadius, setSketchRadius] = useState<string>('50');
+  const [sketchWidth, setSketchWidth] = useState<string>('100');
+  const [sketchHeight, setSketchHeight] = useState<string>('50');
+  const [sketchArcAngle, setSketchArcAngle] = useState<string>('180');
+  const [hudFillLight, setHudFillLight] = useState<number>(1.2);
+  const [hudAmbientLight, setHudAmbientLight] = useState<number>(0.9);
+  const [explodedView, setExplodedView] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'solid' | 'wireframe' | 'xray'>('solid');
+
+  const desenharCirculo = (centerX = sketchStartPoint?.x || 0, centerZ = sketchStartPoint?.z || 0) => {
+    const r = parseFloat(sketchRadius) / 20 || 2.5;
+    const segments = 32;
+    const lines: number[][][] = [];
+    for (let i = 0; i < segments; i++) {
+      const a1 = (i / segments) * Math.PI * 2;
+      const a2 = ((i + 1) / segments) * Math.PI * 2;
+      lines.push([
+        [centerX + r * Math.cos(a1), -2, centerZ + r * Math.sin(a1)],
+        [centerX + r * Math.cos(a2), -2, centerZ + r * Math.sin(a2)]
+      ]);
+    }
+    setSketchLines(prev => [...prev, ...lines]);
+    setToastMessage(`⭕ Círculo (Ø ${(r * 20).toFixed(0)}mm) desenhado no estúdio!`);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const desenharRetangulo = (startX = sketchStartPoint?.x || -2, startZ = sketchStartPoint?.z || -1) => {
+    const w = parseFloat(sketchWidth) / 20 || 4.0;
+    const h = parseFloat(sketchHeight) / 20 || 2.0;
+    const y = -2;
+    const rectLines: number[][][] = [
+      [[startX, y, startZ], [startX + w, y, startZ]],
+      [[startX + w, y, startZ], [startX + w, y, startZ + h]],
+      [[startX + w, y, startZ + h], [startX, y, startZ + h]],
+      [[startX, y, startZ + h], [startX, y, startZ]]
+    ];
+    setSketchLines(prev => [...prev, ...rectLines]);
+    setToastMessage(`▭ Retângulo (${(w * 20).toFixed(0)}x${(h * 20).toFixed(0)}mm) desenhado no estúdio!`);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const desenharArco = (centerX = sketchStartPoint?.x || 0, centerZ = sketchStartPoint?.z || 0) => {
+    const r = parseFloat(sketchRadius) / 20 || 2.5;
+    const sweepDeg = parseFloat(sketchArcAngle) || 180;
+    const sweepRad = (sweepDeg * Math.PI) / 180;
+    const segments = 20;
+    const lines: number[][][] = [];
+    for (let i = 0; i < segments; i++) {
+      const a1 = (i / segments) * sweepRad;
+      const a2 = ((i + 1) / segments) * sweepRad;
+      lines.push([
+        [centerX + r * Math.cos(a1), -2, centerZ + r * Math.sin(a1)],
+        [centerX + r * Math.cos(a2), -2, centerZ + r * Math.sin(a2)]
+      ]);
+    }
+    setSketchLines(prev => [...prev, ...lines]);
+    setToastMessage(`🌙 Arco (${sweepDeg}°, R ${(r * 20).toFixed(0)}mm) desenhado no estúdio!`);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const handleExtrudeToSolid = () => {
+    const newId = `extrude_${Date.now()}`;
+    const shapeType = hudSketchTool === 'circle' ? 'cylinder' : hudSketchTool === 'rectangle' ? 'cube' : 'cylinder';
+    
+    const newModel: User3DModel = {
+      id: newId,
+      title: `Peça CAD Extrudada ${models.length + 1}`,
+      author: currentUser?.displayName || 'Micael Nildo',
+      type: 'peca_solida',
+      meshType: 'cylinder_rocket',
+      primitiveShape: shapeType,
+      visible: true,
+      locked: false,
+      posX: sketchStartPoint?.x || 0,
+      posY: 1.0,
+      posZ: sketchStartPoint?.z || 0,
+      rotX: 0, rotY: 0, rotZ: 0,
+      scaleX: parseFloat(sketchWidth || sketchRadius || '100') / 50 || 1.2,
+      scaleY: hudExtrudeDepth / 200 || 1.5,
+      scaleZ: parseFloat(sketchHeight || sketchRadius || '100') / 50 || 1.2,
+      color: '#38bdf8',
+      description: `Sólido 3D gerado por extrusão CAD com profundidade ${hudExtrudeDepth}mm.`,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setModels(prev => [...prev, newModel]);
+    setSelectedModelId(newId);
+    setSketchLines([]);
+    setSketchStartPoint(null);
+    setToastMessage(`⚡ Sólido CAD extrudado (${hudExtrudeDepth}mm) inserido no estúdio!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleRevolveToSolid = () => {
+    const newId = `revolve_${Date.now()}`;
+    const newModel: User3DModel = {
+      id: newId,
+      title: `Corpo de Revolução CAD ${models.length + 1}`,
+      author: currentUser?.displayName || 'Micael Nildo',
+      type: 'foguete_completo',
+      meshType: 'cylinder_rocket',
+      primitiveShape: 'cone',
+      visible: true,
+      locked: false,
+      posX: 0,
+      posY: 2.0,
+      posZ: 0,
+      rotX: 0, rotY: 0, rotZ: 0,
+      scaleX: parseFloat(hudDiameterMm.toString()) / 60 || 1.3,
+      scaleY: parseFloat(hudLengthMm.toString()) / 500 || 2.0,
+      scaleZ: parseFloat(hudDiameterMm.toString()) / 60 || 1.3,
+      color: '#f59e0b',
+      description: `Sólido de revolução 360° no eixo Y gerado a partir do perfil CAD.`,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setModels(prev => [...prev, newModel]);
+    setSelectedModelId(newId);
+    setSketchLines([]);
+    setSketchStartPoint(null);
+    setToastMessage(`🌀 Sólido de Revolução 360° gerado e inserido no estúdio!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleGenerateCircularPattern = () => {
+    if (!currentModel) {
+      setToastMessage("Selecione um componente para aplicar o Padrão Circular!");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    const count = Math.max(2, Math.min(12, hudPatternCount));
+    const radius = 1.2;
+    const newModels: User3DModel[] = [];
+
+    for (let i = 1; i < count; i++) {
+      const angle = (i * 2 * Math.PI) / count;
+      newModels.push({
+        ...currentModel,
+        id: `${currentModel.id}_pattern_${i}_${Date.now()}`,
+        title: `${currentModel.title} (Cópia Radial ${i + 1})`,
+        posX: currentModel.posX + radius * Math.cos(angle),
+        posZ: currentModel.posZ + radius * Math.sin(angle),
+        rotY: currentModel.rotY + angle,
+        description: `Elemento ${i + 1} de ${count} no padrão circular radial.`
+      });
+    }
+
+    setModels(prev => [...prev, ...newModels]);
+    setToastMessage(`🎯 Padrão circular gerado com ${count} elementos espelhados radiais!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const calcularPontoFinal = () => {
     if (!sketchStartPoint) {
@@ -337,6 +514,51 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
     setSketchAngle('');
     setToastMessage(`⚡ Linha desenhada com sucesso!`);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+
+  const handleCaptureHQPhoto = () => {
+    const mount = isExpanded ? expandedMountRef.current : mountRef.current;
+    const canvas = mount?.querySelector('canvas');
+    if (canvas) {
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `FogueteData_3D_Studio_Render_${Date.now()}.png`;
+      a.click();
+      setToastMessage('📸 Snapshot 4K renderizado e salvo como PNG!');
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleSetView = (view: 'top' | 'front' | 'side' | 'iso' | 'back') => {
+    if (!orbitControlsRef.current) return;
+    const controls = orbitControlsRef.current;
+    const cam = controls.object as THREE.PerspectiveCamera;
+
+    if (view === 'top') {
+      cam.position.set(0, 18, 0.01);
+      controls.target.set(0, 0, 0);
+      setToastMessage('👁️ Vista Superior (Topo Y)');
+    } else if (view === 'front') {
+      cam.position.set(0, 0, 18);
+      controls.target.set(0, 0, 0);
+      setToastMessage('👁️ Vista Frontal (Z)');
+    } else if (view === 'side') {
+      cam.position.set(18, 0, 0);
+      controls.target.set(0, 0, 0);
+      setToastMessage('👁️ Vista Lateral (X)');
+    } else if (view === 'back') {
+      cam.position.set(0, 0, -18);
+      controls.target.set(0, 0, 0);
+      setToastMessage('👁️ Vista Traseira (-Z)');
+    } else {
+      cam.position.set(8, 8, 14);
+      controls.target.set(0, 0, 0);
+      setToastMessage('👁️ Vista Isométrica 3D');
+    }
+    controls.update();
+    setTimeout(() => setToastMessage(null), 1500);
   };
 
   const handleViewportExportPDF = () => {
@@ -394,14 +616,42 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
   const renderInViewportCadHud = () => (
     <>
       {/* Top Banner Over 3D Canvas */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-white/85 dark:bg-slate-950/85 backdrop-blur-md border border-slate-300 dark:border-slate-700/80 px-3 py-1 rounded-full text-[10px] font-mono flex items-center gap-2 sm:gap-3 text-slate-800 dark:text-slate-200 shadow-xl">
-        <span className="flex items-center gap-1 text-red-400 font-bold">
-          <SlidersHorizontal className="w-3 h-3" /> CAD HUD:
-        </span>
-        <span>$L$: <strong className="text-slate-900 dark:text-white">{hudLengthMm}mm</strong></span>
-        <span>$\varnothing$: <strong className="text-slate-900 dark:text-white">{hudDiameterMm}mm</strong></span>
-        <span>$t$: <strong className="text-slate-900 dark:text-white">{hudWallThicknessMm}mm</strong></span>
-        <span className="hidden sm:inline text-amber-400 font-bold uppercase">{hudTubeType}</span>
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+        <div className="bg-white/85 dark:bg-slate-950/85 backdrop-blur-md border border-slate-300 dark:border-slate-700/80 px-3 py-1.5 rounded-full text-[10px] font-mono flex items-center gap-2 sm:gap-3 text-slate-800 dark:text-slate-200 shadow-xl">
+          <span className="flex items-center gap-1 text-red-400 font-bold">
+            <SlidersHorizontal className="w-3 h-3" /> CAD HUD:
+          </span>
+          <span>$L$: <strong className="text-slate-900 dark:text-white">{hudLengthMm}mm</strong></span>
+          <span>$\varnothing$: <strong className="text-slate-900 dark:text-white">{hudDiameterMm}mm</strong></span>
+          <span>$t$: <strong className="text-slate-900 dark:text-white">{hudWallThicknessMm}mm</strong></span>
+          <span className="hidden sm:inline text-amber-400 font-bold uppercase">{hudTubeType}</span>
+        </div>
+        
+        <div className="bg-white/85 dark:bg-slate-950/85 backdrop-blur-md border border-slate-300 dark:border-slate-700/80 px-3 py-1.5 rounded-full text-[10px] font-mono flex items-center gap-4 text-slate-800 dark:text-slate-200 shadow-xl">
+          <div className="flex items-center gap-1">
+            <span className="font-bold text-red-400">Modo Visual:</span>
+            <select 
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as any)}
+              className="bg-transparent border-none text-slate-900 dark:text-white font-bold outline-none cursor-pointer"
+            >
+              <option value="solid">Sólido</option>
+              <option value="wireframe">Wireframe</option>
+              <option value="xray">Raio-X / Transparente</option>
+            </select>
+          </div>
+          <div className="w-px h-3 bg-slate-300 dark:bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-red-400">Visão Explodida:</span>
+            <input 
+              type="range" min="0" max="1" step="0.01" 
+              value={explodedView} 
+              onChange={(e) => setExplodedView(parseFloat(e.target.value))}
+              className="w-24 accent-red-500 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full appearance-none cursor-pointer"
+            />
+            <span className="text-slate-900 dark:text-white font-bold min-w-[30px]">{(explodedView * 100).toFixed(0)}%</span>
+          </div>
+        </div>
       </div>
 
       {/* Floating Panel (when a tab is selected) */}
@@ -410,7 +660,9 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           <div className="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-2 mb-2">
             <span className="font-bold text-red-400 uppercase flex items-center gap-1.5">
               {activeViewportCadTab === 'measures' && <><Sliders className="w-4 h-4 text-red-500" /> Medidas Exatas & Perfis CAD</>}
+              {activeViewportCadTab === 'mesh_edit' && <><Layers className="w-4 h-4 text-cyan-400" /> Edição de Malha 3D & Sub-Objetos</>}
               {activeViewportCadTab === 'sketch' && <><Edit3 className="w-4 h-4 text-amber-400" /> Esboço 2D/3D & Restrições Geométricas</>}
+              {activeViewportCadTab === 'propulsion' && <><Flame className="w-4 h-4 text-orange-400" /> Termodinâmica de Propulsão & Bocal Laval</>}
               {activeViewportCadTab === 'lighting' && <><Sun className="w-4 h-4 text-yellow-400" /> Iluminação Estúdio & Render HQ</>}
               {activeViewportCadTab === 'export' && <><Printer className="w-4 h-4 text-emerald-400" /> Exportação Técnica & Usinagem CNC</>}
             </span>
@@ -477,19 +729,128 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               </div>
               <div>
                 <label className="block text-slate-500 dark:text-slate-400 mb-1">Padrão Circular (Circular Pattern):</label>
-                <input
-                  type="number"
-                  min="2"
-                  max="12"
-                  value={hudPatternCount}
-                  onChange={(e) => setHudPatternCount(Number(e.target.value))}
-                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 text-slate-900 dark:text-white font-mono"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="2"
+                    max="12"
+                    value={hudPatternCount}
+                    onChange={(e) => setHudPatternCount(Number(e.target.value))}
+                    className="w-20 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 text-slate-900 dark:text-white font-mono text-[11px]"
+                  />
+                  <button
+                    onClick={handleGenerateCircularPattern}
+                    className="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 shadow"
+                  >
+                    <Repeat className="w-3 h-3" />
+                    Gerar Copias Radiais
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: SKETCH */}
+          {/* TAB 2: MESH EDIT SUB-OBJECTS */}
+          {activeViewportCadTab === 'mesh_edit' && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-300 dark:border-slate-800 pb-2">
+                <span className="text-slate-400">Modo de Seleção:</span>
+                {(['object', 'vertex', 'edge', 'face'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setSubObjectMode(mode);
+                      setToastMessage(`🎯 Modo de Sub-Objeto "${mode.toUpperCase()}" ativado no Canvas 3D`);
+                      setTimeout(() => setToastMessage(null), 2000);
+                    }}
+                    className={`px-2.5 py-1 rounded border uppercase font-bold text-[10px] ${
+                      subObjectMode === mode
+                        ? 'bg-cyan-600 text-white border-cyan-400'
+                        : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800'
+                    }`}
+                  >
+                    {mode === 'object' ? 'Objeto Inteiro' : mode === 'vertex' ? 'Vértices (V)' : mode === 'edge' ? 'Arestas (E)' : 'Faces (F)'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">Extrusão de Face (mm): <strong className="text-cyan-300">{meshExtrudeMm} mm</strong></label>
+                  <div className="flex gap-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="150"
+                      value={meshExtrudeMm}
+                      onChange={(e) => setMeshExtrudeMm(Number(e.target.value))}
+                      className="w-full accent-cyan-500 cursor-pointer"
+                    />
+                    <button
+                      onClick={() => {
+                        setToastMessage(`⚡ Face extrudada em +${meshExtrudeMm}mm na normal da superfície`);
+                        setTimeout(() => setToastMessage(null), 2500);
+                      }}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 dark:text-white font-bold px-2 py-1 rounded whitespace-nowrap"
+                    >
+                      Extrudar
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Subdivisão Loop Cut: <strong className="text-cyan-300">Nível {meshSubdivideLevel}</strong></label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setMeshSubdivideLevel(prev => Math.min(4, prev + 1));
+                        setToastMessage(`📐 Malha subdividida! Quad-count refinado.`);
+                        setTimeout(() => setToastMessage(null), 2500);
+                      }}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 dark:text-white font-bold px-3 py-1 rounded w-full"
+                    >
+                      Subdividir Malha (+1)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Alinhamento de Vértices:</label>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        setToastMessage(`🎯 Vértices alinhados no Eixo X (Plano Sagital)`);
+                        setTimeout(() => setToastMessage(null), 2000);
+                      }}
+                      className="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-2 py-1 rounded font-bold text-[10px]"
+                    >
+                      Alinhar X
+                    </button>
+                    <button
+                      onClick={() => {
+                        setToastMessage(`🎯 Vértices alinhados no Eixo Y (Origem Axial)`);
+                        setTimeout(() => setToastMessage(null), 2000);
+                      }}
+                      className="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-2 py-1 rounded font-bold text-[10px]"
+                    >
+                      Alinhar Y
+                    </button>
+                    <button
+                      onClick={() => {
+                        setToastMessage(`🎯 Vértices alinhados no Eixo Z`);
+                        setTimeout(() => setToastMessage(null), 2000);
+                      }}
+                      className="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-2 py-1 rounded font-bold text-[10px]"
+                    >
+                      Alinhar Z
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SKETCH */}
           {activeViewportCadTab === 'sketch' && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -570,7 +931,85 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             </div>
           )}
 
-          {/* TAB 3: LIGHTING */}
+          {/* TAB 4: PROPULSION THERMODYNAMICS */}
+          {activeViewportCadTab === 'propulsion' && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">Par Propelente:</label>
+                  <select
+                    value={propellantPair}
+                    onChange={(e) => setPropellantPair(e.target.value as any)}
+                    className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-1 text-slate-900 dark:text-white"
+                  >
+                    <option value="lox_rp1">LOX / RP-1 (3670 K)</option>
+                    <option value="lox_ch4">LOX / CH4 Metano (3520 K)</option>
+                    <option value="n2o_htPB">N2O / HTPB Híbrido (3150 K)</option>
+                    <option value="n2o_paraffin">N2O / Parafina (3280 K)</option>
+                    <option value="hno3_kerosene">HNO3 / Kerosene (3100 K)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Pressão Câmara ($P_c$): <strong className="text-orange-400">{chamberPressureBar} bar</strong></label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="1"
+                    value={chamberPressureBar}
+                    onChange={(e) => setChamberPressureBar(Number(e.target.value))}
+                    className="w-full accent-orange-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Razão de Expansão ($\epsilon$): <strong className="text-orange-400">{expansionRatio}:1</strong></label>
+                  <input
+                    type="range"
+                    min="4"
+                    max="50"
+                    step="1"
+                    value={expansionRatio}
+                    onChange={(e) => setExpansionRatio(Number(e.target.value))}
+                    className="w-full accent-orange-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Diâmetro Garganta ($d_t$): <strong className="text-orange-400">{throatDiameterMm} mm</strong></label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="1"
+                    value={throatDiameterMm}
+                    onChange={(e) => setThroatDiameterMm(Number(e.target.value))}
+                    className="w-full accent-orange-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded-lg border border-slate-300 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400">Empuxo Estimado (F): <strong className="text-orange-400 text-xs">{(0.001 * chamberPressureBar * 0.98 * Math.PI * Math.pow(throatDiameterMm/2, 2) * expansionRatio * 0.15).toFixed(2)} kN</strong></span>
+                  <span className="text-slate-400">Impulso Específico (Isp): <strong className="text-emerald-400 text-xs">{Math.round(230 + expansionRatio * 1.8 + chamberPressureBar * 0.4)} s</strong></span>
+                  <span className="text-slate-400">Velocidade Exaustão (c*): <strong className="text-cyan-400 text-xs">{Math.round(1550 + chamberPressureBar * 4)} m/s</strong></span>
+                </div>
+                <button
+                  onClick={() => {
+                    setToastMessage(`🔥 Parâmetros de bocal Laval sincronizados no estúdio 3D!`);
+                    setTimeout(() => setToastMessage(null), 2500);
+                  }}
+                  className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-3 py-1 rounded shadow"
+                >
+                  Sincronizar Bocal no Modelo
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LIGHTING */}
           {activeViewportCadTab === 'lighting' && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -597,7 +1036,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
             </div>
           )}
 
-          {/* TAB 4: EXPORT */}
+          {/* TAB 6: EXPORT */}
           {activeViewportCadTab === 'export' && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
@@ -645,6 +1084,19 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'mesh_edit' ? 'none' : 'mesh_edit')}
+          className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
+            activeViewportCadTab === 'mesh_edit'
+              ? 'bg-cyan-600 text-white border border-cyan-400'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
+          }`}
+          title="Edição de Malha 3D, Vértices, Arestas e Subdivisão"
+        >
+          <Layers className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">2. Malha 3D</span>
+        </button>
+
+        <button
           onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'sketch' ? 'none' : 'sketch')}
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'sketch'
@@ -654,7 +1106,20 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           title="Abrir Ferramentas de Esboço 2D/3D e Restrições"
         >
           <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">2. Esboço</span>
+          <span className="hidden sm:inline">3. Esboço</span>
+        </button>
+
+        <button
+          onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'propulsion' ? 'none' : 'propulsion')}
+          className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
+            activeViewportCadTab === 'propulsion'
+              ? 'bg-orange-600 text-white border border-orange-400'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
+          }`}
+          title="Simulação de Termodinâmica de Propulsão e Bocal Laval"
+        >
+          <Flame className="w-3.5 h-3.5 text-orange-400" />
+          <span className="hidden sm:inline">4. Propulsão</span>
         </button>
 
         <button
@@ -667,20 +1132,20 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
           title="Controle de Iluminação de Estúdio e Render HQ"
         >
           <Sun className="w-3.5 h-3.5 text-yellow-400" />
-          <span className="hidden sm:inline">3. Iluminação</span>
+          <span className="hidden sm:inline">5. Iluminação</span>
         </button>
 
         <button
           onClick={() => setActiveViewportCadTab(activeViewportCadTab === 'export' ? 'none' : 'export')}
           className={`px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition ${
             activeViewportCadTab === 'export'
-              ? 'bg-emerald-600 text-slate-900 dark:text-white border border-emerald-400'
+              ? 'bg-emerald-600 text-white border border-emerald-400'
               : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-white border border-slate-300 dark:border-slate-800'
           }`}
           title="Exportar Desenho PDF A3, STL e Usinagem CNC"
         >
           <Printer className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">4. Exportar</span>
+          <span className="hidden sm:inline">6. Exportar</span>
         </button>
 
         <button
@@ -1237,15 +1702,54 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
       const customGeo = importedGeometriesRef.current[m.id];
       const meshObj = createMeshForModel(m, customGeo);
+      
+      // Exploded View logic: push objects away from center along Y axis based on their initial Y pos
+      const explodeOffset = m.posY > 0 ? explodedView * m.posY : (m.posY < 0 ? explodedView * m.posY : 0);
+      meshObj.position.set(m.posX, m.posY + explodeOffset, m.posZ);
 
-      meshObj.position.set(m.posX, m.posY, m.posZ);
       meshObj.rotation.set(m.rotX, m.rotY, m.rotZ);
       meshObj.scale.set(m.scaleX, m.scaleY, m.scaleZ);
       
       meshObj.userData = { id: m.id };
       meshObj.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.isMesh && mesh.material) {
+          const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone() as THREE.MeshStandardMaterial;
+          mesh.material = mat;
+          if (viewMode === 'wireframe') {
+            mat.wireframe = true;
+          } else if (viewMode === 'xray') {
+            mat.transparent = true;
+            mat.opacity = 0.3;
+            mat.depthWrite = false;
+          }
+        }
+
         child.userData = { id: m.id };
+        if (mesh.isMesh && m.id === selectedModelId && mesh.material) {
+          const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone() as THREE.MeshStandardMaterial;
+          mat.emissive = new THREE.Color(0xef4444);
+          mat.emissiveIntensity = 0.5;
+          mesh.material = mat;
+        }
       });
+      
+      const rootMesh = meshObj as THREE.Mesh;
+      if (rootMesh.isMesh && rootMesh.material) {
+        const mat = (Array.isArray(rootMesh.material) ? rootMesh.material[0] : rootMesh.material).clone() as THREE.MeshStandardMaterial;
+        rootMesh.material = mat;
+        if (viewMode === 'wireframe') {
+          mat.wireframe = true;
+        } else if (viewMode === 'xray') {
+          mat.transparent = true;
+          mat.opacity = 0.3;
+          mat.depthWrite = false;
+        }
+        if (m.id === selectedModelId) {
+          mat.emissive = new THREE.Color(0xef4444);
+          mat.emissiveIntensity = 0.5;
+        }
+      }
 
       objectsGroup.add(meshObj);
 
@@ -1303,39 +1807,36 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
 
       raycaster.setFromCamera(mouse, camera);
 
-      // Se estiver no modo Sketch, a gente pega a coordenada do Grid no Z=0
-      if (activeViewportCadTab === 'sketch' && hudSketchTool === 'line') {
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 2); // plano Y=-2 (posição do grid)
+      // Se estiver no modo Sketch, a gente intercepta o clique no Grid 3D
+      if (activeViewportCadTab === 'sketch') {
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 2);
         const target = new THREE.Vector3();
         raycaster.ray.intersectPlane(plane, target);
         if (target) {
-          // Fixando em Z=0 no grid
-          if (!sketchStartPoint) {
-            setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
-            setToastMessage(`Ponto Inicial: (${target.x.toFixed(1)}, ${target.z.toFixed(1)}). Selecione o final ou digite medida/ângulo.`);
-            setTimeout(() => setToastMessage(null), 3000);
-          } else {
-            // Desenha linha até o alvo e o alvo vira o novo ponto inicial
-            const novaLinha = [
-              [sketchStartPoint.x, sketchStartPoint.y, sketchStartPoint.z],
-              [target.x, target.y, target.z]
-            ];
-            setSketchLines(prev => [...prev, novaLinha]);
-            setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
-            
-            // Atualiza inputs com a medida e angulo reais
-            const dx = target.x - sketchStartPoint.x;
-            const dz = target.z - sketchStartPoint.z;
-            const dist = Math.sqrt(dx*dx + dz*dz).toFixed(1);
-            let ang = (Math.atan2(dz, dx) * 180 / Math.PI).toFixed(1);
-            if (parseFloat(ang) < 0) ang = (360 + parseFloat(ang)).toFixed(1);
-            
-            setSketchMeasure(dist);
-            setSketchAngle(ang);
-            
-            setToastMessage(`Linha Desenhada. Novo Ponto Inicial: (${target.x.toFixed(1)}, ${target.z.toFixed(1)}).`);
-            setTimeout(() => setToastMessage(null), 3000);
+          if (hudSketchTool === 'line') {
+            if (!sketchStartPoint) {
+              setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
+              setToastMessage(`Ponto Inicial: (${target.x.toFixed(1)}, ${target.z.toFixed(1)}). Clique no próximo ponto.`);
+            } else {
+              const novaLinha = [
+                [sketchStartPoint.x, sketchStartPoint.y, sketchStartPoint.z],
+                [target.x, target.y, target.z]
+              ];
+              setSketchLines(prev => [...prev, novaLinha]);
+              setSketchStartPoint({ x: target.x, y: target.y, z: target.z });
+              const dx = target.x - sketchStartPoint.x;
+              const dz = target.z - sketchStartPoint.z;
+              setSketchMeasure((Math.sqrt(dx*dx + dz*dz) * 20).toFixed(0));
+              setToastMessage(`Linha desenhada! Ponto: (${target.x.toFixed(1)}, ${target.z.toFixed(1)})`);
+            }
+          } else if (hudSketchTool === 'circle') {
+            desenharCirculo(target.x, target.z);
+          } else if (hudSketchTool === 'rectangle') {
+            desenharRetangulo(target.x, target.z);
+          } else if (hudSketchTool === 'arc') {
+            desenharArco(target.x, target.z);
           }
+          setTimeout(() => setToastMessage(null), 2500);
         }
         return;
       }
@@ -1374,7 +1875,7 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
       orbitControls.dispose();
       renderer.dispose();
     };
-  }, [models, selectedModelId, isExpanded, activeGizmoTool, pushHistory, sketchLines, sketchStartPoint, activeViewportCadTab]);
+  }, [models, selectedModelId, isExpanded, activeGizmoTool, pushHistory, sketchLines, sketchStartPoint, activeViewportCadTab, hudSketchTool, hudKeyLight, hudFillLight, hudAmbientLight, explodedView, viewMode]);
 
   // Handle Transform Slider Change
   const handleTransformChange = (field: keyof User3DModel, val: number) => {
@@ -1387,29 +1888,6 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
     setModels((prev) =>
       prev.map((m) => (m.id === selectedModelId ? { ...m, [field]: val } : m))
     );
-  };
-
-  const handleSetView = (view: 'front' | 'top' | 'side' | 'iso') => {
-    if (!orbitControlsRef.current) return;
-    const camera = orbitControlsRef.current.object as THREE.PerspectiveCamera;
-    
-    switch (view) {
-      case 'front':
-        camera.position.set(0, 0, 14);
-        break;
-      case 'top':
-        camera.position.set(0, 14, 0);
-        break;
-      case 'side':
-        camera.position.set(14, 0, 0);
-        break;
-      case 'iso':
-        camera.position.set(8, 8, 14);
-        break;
-    }
-    camera.lookAt(0, 0, 0);
-    orbitControlsRef.current.target.set(0, 0, 0);
-    orbitControlsRef.current.update();
   };
 
   const handleAddModel = (e: React.FormEvent) => {
@@ -1490,6 +1968,16 @@ export const User3DModelStudio: React.FC<User3DModelStudioProps> = ({
               className="hidden"
             />
           </label>
+
+          {onStartWalkthrough && (
+            <button
+              onClick={onStartWalkthrough}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/20 font-mono"
+            >
+              <Sparkles className="w-4 h-4 text-amber-200" />
+              <span>💡 Tour Guiado 3D</span>
+            </button>
+          )}
 
           {currentUser ? (
             <button
