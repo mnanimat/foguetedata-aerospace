@@ -9,10 +9,26 @@ import {
   Users, User as UserIcon, CheckSquare, Calendar, Link as LinkIcon, Plus, Youtube, FileSpreadsheet, 
   ExternalLink, Trash2, Edit3, DollarSign, Truck, Rocket, Flame, Cpu, Shield, 
   Clock, ChevronLeft, ChevronRight, FileText, CheckCircle2, AlertCircle, Tag, 
-  Filter, Search, Paperclip, Download, PieChart, Layers, Settings, X, ArrowLeftRight,
+  Filter, Search, Paperclip, Download, PieChart as PieChartIcon, Layers, Settings, X, ArrowLeftRight,
   Move, ChevronDown, Check, FolderPlus, Upload, UserPlus, Table, BarChart2,
   TrendingUp, Sparkles, FileDown, ArrowUp, ArrowDown, Activity, Sliders, Layout, GripVertical
 } from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend, 
+  CartesianGrid, 
+  PieChart as RechartsPieChart, 
+  Pie, 
+  Cell, 
+  AreaChart, 
+  Area, 
+  Line 
+} from 'recharts';
 
 interface TeamManagementProps {
   currentUser: User | null;
@@ -369,6 +385,380 @@ const INITIAL_RESOURCES: TeamResourceLink[] = [
     category: 'Relatório de Cálculo'
   }
 ];
+
+interface TeamProgressChartsProps {
+  tasks: PlannerTask[];
+  departments: Department[];
+}
+
+export const TeamProgressCharts: React.FC<TeamProgressChartsProps> = ({ tasks, departments }) => {
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
+  const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>('ALL');
+
+  // Filter tasks if requested
+  const filteredTasks = tasks.filter((t) => {
+    const matchesDept = selectedDeptFilter === 'ALL' || t.departmentId === selectedDeptFilter;
+    const matchesPriority = selectedPriorityFilter === 'ALL' || t.priority === selectedPriorityFilter;
+    return matchesDept && matchesPriority;
+  });
+
+  // 1. Data per Department (Concluído, Em Teste, Em Progresso, A Fazer)
+  const deptProgressData = departments.map((dept) => {
+    const deptTasks = filteredTasks.filter((t) => t.departmentId === dept.id);
+    const completed = deptTasks.filter((t) => t.status === 'Concluído').length;
+    const inTesting = deptTasks.filter((t) => t.status === 'Em Teste').length;
+    const inProgress = deptTasks.filter((t) => t.status === 'Em Progresso').length;
+    const todo = deptTasks.filter((t) => t.status === 'A Fazer').length;
+    const total = deptTasks.length;
+
+    let pctSum = 0;
+    deptTasks.forEach((t) => {
+      if (t.status === 'Concluído') pctSum += 100;
+      else if (t.status === 'Em Teste') pctSum += 75;
+      else if (t.status === 'Em Progresso') pctSum += 50;
+      else if (t.checklist && t.checklist.length > 0) {
+        const doneItems = t.checklist.filter((c) => c.done).length;
+        pctSum += Math.round((doneItems / t.checklist.length) * 100);
+      }
+    });
+    const avgProgress = total > 0 ? Math.round(pctSum / total) : 0;
+
+    return {
+      id: dept.id,
+      name: dept.name,
+      code: dept.code,
+      color: dept.color,
+      'Concluído': completed,
+      'Em Teste': inTesting,
+      'Em Progresso': inProgress,
+      'A Fazer': todo,
+      'Progresso Médio (%)': avgProgress,
+      total
+    };
+  });
+
+  // 2. Critical Milestones Tasks (% completion based on status and checklist)
+  const criticalMilestones = filteredTasks
+    .filter((t) => t.priority === 'Crítica' || t.priority === 'Alta')
+    .map((t) => {
+      const dept = departments.find((d) => d.id === t.departmentId);
+      let pct = 0;
+      if (t.status === 'Concluído') pct = 100;
+      else if (t.status === 'Em Teste') pct = 75;
+      else if (t.status === 'Em Progresso') pct = 50;
+
+      if (t.checklist && t.checklist.length > 0) {
+        const doneCount = t.checklist.filter((c) => c.done).length;
+        const checkPct = Math.round((doneCount / t.checklist.length) * 100);
+        if (t.status !== 'Concluído') pct = Math.max(pct, checkPct);
+      }
+
+      return {
+        id: t.id,
+        shortTitle: t.title.length > 32 ? t.title.slice(0, 30) + '...' : t.title,
+        fullTitle: t.title,
+        department: dept ? dept.code : 'GERAL',
+        deptColor: dept?.color || '#ef4444',
+        assignee: t.assignee,
+        status: t.status,
+        priority: t.priority,
+        progresso: pct,
+        endDate: t.endDate
+      };
+    })
+    .sort((a, b) => (a.priority === 'Crítica' ? -1 : 1));
+
+  // 3. Status Breakdown Pie Chart Data
+  const statusPieData = [
+    { name: 'Concluído', value: filteredTasks.filter((t) => t.status === 'Concluído').length, color: '#10b981' },
+    { name: 'Em Teste', value: filteredTasks.filter((t) => t.status === 'Em Teste').length, color: '#06b6d4' },
+    { name: 'Em Progresso', value: filteredTasks.filter((t) => t.status === 'Em Progresso').length, color: '#f59e0b' },
+    { name: 'A Fazer', value: filteredTasks.filter((t) => t.status === 'A Fazer').length, color: '#ef4444' }
+  ].filter((d) => d.value > 0);
+
+  // Overall Completion %
+  const totalTasks = filteredTasks.length;
+  const completedTasksCount = filteredTasks.filter((t) => t.status === 'Concluído').length;
+  const overallPct = totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0;
+
+  // 4. Time Progress Cumulative Data
+  const datesSorted = Array.from(new Set(filteredTasks.map((t) => t.endDate))).sort();
+  const timelineData = datesSorted.map((dStr) => {
+    const tasksUntil = filteredTasks.filter((t) => t.endDate <= dStr);
+    const doneUntil = tasksUntil.filter((t) => t.status === 'Concluído').length;
+    const criticalDoneUntil = tasksUntil.filter((t) => (t.priority === 'Crítica' || t.priority === 'Alta') && t.status === 'Concluído').length;
+    return {
+      date: new Date(dStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      'Tarefas Concluídas': doneUntil,
+      'Marcos Críticos Concluídos': criticalDoneUntil,
+      'Total Planejado': tasksUntil.length
+    };
+  });
+
+  return (
+    <div className="space-y-6 font-mono text-xs">
+      {/* Controls Bar for Filtering Charts */}
+      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+          <div>
+            <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+              Gráficos de Progresso & Marcos Críticos
+              <span className="bg-amber-950 text-amber-300 border border-amber-800 text-[10px] px-2 py-0.5 rounded font-mono">
+                Recharts Engine
+              </span>
+            </h4>
+            <p className="text-[11px] text-slate-400">Acompanhamento visual da conclusão das metas e entregas críticas da equipe aeroespacial.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <select
+            value={selectedDeptFilter}
+            onChange={(e) => setSelectedDeptFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-800 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-mono"
+          >
+            <option value="ALL">Todas as Áreas ({departments.length})</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedPriorityFilter}
+            onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+            className="bg-slate-900 border border-slate-800 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-mono"
+          >
+            <option value="ALL">Todas as Prioridades</option>
+            <option value="Crítica">🚨 Somente Marcos Críticos</option>
+            <option value="Alta">⚡ Alta Prioridade</option>
+            <option value="Média">🔹 Prioridade Média</option>
+            <option value="Baixa">🔹 Prioridade Baixa</option>
+          </select>
+        </div>
+      </div>
+
+      {/* KPI Cards Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl space-y-1">
+          <div className="text-[10px] text-slate-400 uppercase font-mono">Taxa de Conclusão Global</div>
+          <div className="text-2xl font-black text-emerald-400 font-mono">{overallPct}%</div>
+          <div className="text-[10px] text-slate-500 font-mono">{completedTasksCount} de {totalTasks} atividades entregues</div>
+        </div>
+
+        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl space-y-1">
+          <div className="text-[10px] text-slate-400 uppercase font-mono">Marcos Críticos Prontos</div>
+          <div className="text-2xl font-black text-red-400 font-mono">
+            {criticalMilestones.filter((m) => m.status === 'Concluído').length} / {criticalMilestones.length}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">Entregáveis de Alta / Crítica prioridade</div>
+        </div>
+
+        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl space-y-1">
+          <div className="text-[10px] text-slate-400 uppercase font-mono">Atividades em Execução</div>
+          <div className="text-2xl font-black text-amber-400 font-mono">
+            {filteredTasks.filter((t) => t.status === 'Em Progresso' || t.status === 'Em Teste').length}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">Em desenvolvimento ou teste de campo</div>
+        </div>
+
+        <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl space-y-1">
+          <div className="text-[10px] text-slate-400 uppercase font-mono">Atividades Fila de Espera</div>
+          <div className="text-2xl font-black text-slate-300 font-mono">
+            {filteredTasks.filter((t) => t.status === 'A Fazer').length}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">Status "A Fazer" pendentes</div>
+        </div>
+      </div>
+
+      {/* Main Recharts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Chart 1: Task Completion per Subsystem / Area (Stacked BarChart) */}
+        <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-3 shadow-xl">
+          <div className="flex justify-between items-center border-b border-slate-900 pb-3">
+            <div>
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-emerald-400" />
+                Conclusão de Tarefas por Subsistema (Empilhado)
+              </h4>
+              <p className="text-[11px] text-slate-400">Distribuição de Concluído, Em Teste, Em Progresso e A Fazer</p>
+            </div>
+            <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-mono">
+              Empilhado
+            </span>
+          </div>
+
+          <div className="h-64 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={deptProgressData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="code" stroke="#64748b" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                <YAxis stroke="#64748b" tick={{ fill: '#cbd5e1', fontSize: 11 }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0b0f17', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Bar dataKey="Concluído" stackId="a" fill="#10b981" />
+                <Bar dataKey="Em Teste" stackId="a" fill="#06b6d4" />
+                <Bar dataKey="Em Progresso" stackId="a" fill="#f59e0b" />
+                <Bar dataKey="A Fazer" stackId="a" fill="#ef4444" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 2: Status Breakdown Donut PieChart */}
+        <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-3 shadow-xl">
+          <div className="flex justify-between items-center border-b border-slate-900 pb-3">
+            <div>
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <PieChartIcon className="w-4 h-4 text-cyan-400" />
+                Proporção do Status Geral do Projeto
+              </h4>
+              <p className="text-[11px] text-slate-400">Volume percentual por estado das entregas técnicas</p>
+            </div>
+            <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-mono">
+              Rosca
+            </span>
+          </div>
+
+          <div className="h-64 w-full flex items-center justify-center relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPieChart>
+                <Pie
+                  data={statusPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  labelLine={false}
+                >
+                  {statusPieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0b0f17', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
+              <span className="text-2xl font-black text-white font-mono">{overallPct}%</span>
+              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-mono">Concluído</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Chart 3: Critical Milestones Horizontal BarChart */}
+        <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-3 lg:col-span-2 shadow-xl">
+          <div className="flex justify-between items-center border-b border-slate-900 pb-3">
+            <div>
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <Flame className="w-4 h-4 text-red-500" />
+                Barra de Progresso dos Marcos Críticos e Entregáveis Altas (%)
+              </h4>
+              <p className="text-[11px] text-slate-400">Porcentagem individual de avanço nas tarefas mais críticas do foguete</p>
+            </div>
+            <span className="text-[10px] bg-red-950 text-red-300 border border-red-800 px-2 py-0.5 rounded font-mono">
+              {criticalMilestones.length} Marcos Listados
+            </span>
+          </div>
+
+          <div className="h-72 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={criticalMilestones}
+                margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis type="number" domain={[0, 100]} stroke="#64748b" tick={{ fill: '#cbd5e1', fontSize: 11 }} unit="%" />
+                <YAxis dataKey="shortTitle" type="category" stroke="#64748b" tick={{ fill: '#e2e8f0', fontSize: 11 }} width={180} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0b0f17', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                  formatter={(value: any, name: any, item: any) => [
+                    `${value}% (${item.payload.status}) - Resp: ${item.payload.assignee}`,
+                    'Progresso'
+                  ]}
+                />
+                <Bar dataKey="progresso" radius={[0, 8, 8, 0]}>
+                  {criticalMilestones.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        entry.progresso === 100
+                          ? '#10b981'
+                          : entry.progresso >= 50
+                          ? '#f59e0b'
+                          : entry.priority === 'Crítica'
+                          ? '#ef4444'
+                          : '#3b82f6'
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 4: Timeline Progress AreaChart */}
+        {timelineData.length > 0 && (
+          <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-3 lg:col-span-2 shadow-xl">
+            <div className="flex justify-between items-center border-b border-slate-900 pb-3">
+              <div>
+                <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  Evolução Temporal e Conclusão de Marcos
+                </h4>
+                <p className="text-[11px] text-slate-400">Linha de acúmulo de atividades e marcos finalizados ao longo do prazo</p>
+              </div>
+              <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-mono">
+                Linha do Tempo
+              </span>
+            </div>
+
+            <div className="h-64 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={timelineData} margin={{ top: 10, right: 20, left: -10, bottom: 10 }}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorDone" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#64748b" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                  <YAxis stroke="#64748b" tick={{ fill: '#cbd5e1', fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0b0f17', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Area type="monotone" dataKey="Total Planejado" stroke="#3b82f6" fillOpacity={1} fill="url(#colorTotal)" />
+                  <Area type="monotone" dataKey="Tarefas Concluídas" stroke="#10b981" fillOpacity={1} fill="url(#colorDone)" />
+                  <Line type="monotone" dataKey="Marcos Críticos Concluídos" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
 
 export const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, onOpenAuthModal }) => {
   // Main Sub-Tab Navigation
@@ -2229,6 +2619,18 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, onO
             </button>
           </div>
 
+          {/* Interactive Recharts Progress & Critical Milestones Panel */}
+          <TeamProgressCharts tasks={tasks} departments={departments} />
+
+          {/* Title for custom widgets */}
+          <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
+            <h4 className="text-sm font-bold text-slate-200 font-mono flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-400" />
+              Widgets e Indicadores Adicionais
+            </h4>
+            <span className="text-[11px] text-slate-400 font-mono">{dashboardWidgets.length} configurados</span>
+          </div>
+
           {/* Dynamic Grid of Editable Dashboard Widgets */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {dashboardWidgets.map((widget) => {
@@ -2276,16 +2678,53 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({ currentUser, onO
                   )}
 
                   {widget.type === 'chart_tasks' && (
-                    <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-                      {['A Fazer', 'Em Progresso', 'Em Teste', 'Concluído'].map((st) => {
-                        const count = tasks.filter((t) => t.status === st).length;
-                        return (
-                          <div key={st} className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center space-y-1">
-                            <div className="text-slate-400 text-[10px] uppercase">{st}</div>
-                            <div className="text-xl font-bold text-white">{count} tarefas</div>
-                          </div>
-                        );
-                      })}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                        {[
+                          { st: 'Concluído', color: '#10b981' },
+                          { st: 'Em Teste', color: '#06b6d4' },
+                          { st: 'Em Progresso', color: '#f59e0b' },
+                          { st: 'A Fazer', color: '#ef4444' }
+                        ].map(({ st, color }) => {
+                          const count = tasks.filter((t) => t.status === st).length;
+                          return (
+                            <div key={st} className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center space-y-1">
+                              <div className="text-slate-400 text-[10px] uppercase font-bold" style={{ color }}>{st}</div>
+                              <div className="text-xl font-bold text-white">{count} tarefas</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Mini Recharts Bar Chart in Widget */}
+                      <div className="h-36 w-full pt-2 bg-slate-900/60 p-2 rounded-xl border border-slate-900">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={[
+                              { status: 'Concluído', count: tasks.filter((t) => t.status === 'Concluído').length, fill: '#10b981' },
+                              { status: 'Em Teste', count: tasks.filter((t) => t.status === 'Em Teste').length, fill: '#06b6d4' },
+                              { status: 'Em Progresso', count: tasks.filter((t) => t.status === 'Em Progresso').length, fill: '#f59e0b' },
+                              { status: 'A Fazer', count: tasks.filter((t) => t.status === 'A Fazer').length, fill: '#ef4444' }
+                            ]}
+                            margin={{ top: 5, right: 5, left: -25, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="2 2" stroke="#1e293b" />
+                            <XAxis dataKey="status" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                            <YAxis stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 10 }} allowDecimals={false} />
+                            <Tooltip contentStyle={{ backgroundColor: '#0b0f17', borderColor: '#334155', borderRadius: '8px', fontSize: '11px', color: '#fff' }} />
+                            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                              {[
+                                { fill: '#10b981' },
+                                { fill: '#06b6d4' },
+                                { fill: '#f59e0b' },
+                                { fill: '#ef4444' }
+                              ].map((entry, index) => (
+                                <Cell key={`widget-cell-${index}`} fill={entry.fill} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   )}
 
