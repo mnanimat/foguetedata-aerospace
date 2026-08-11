@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { jsPDF } from 'jspdf';
 import { RocketParams } from '../types';
 import { calculatePreciseTrajectory, TrajectorySummary } from '../utils/rocketPhysics';
 import { Rocket3DViewer } from './Rocket3DViewer';
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Download,
+  FileText,
   Wind,
   Compass,
   Cpu,
@@ -116,6 +118,287 @@ export const FlightSimulator: React.FC = () => {
     a.click();
   };
 
+  // Export Trajectory Simulation PDF Report
+  const handleExportPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Page styling & header banner
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(0, 0, 210, 28, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('PROJETO BAR-AEB - RELATÓRIO TÉCNICO DE SIMULAÇÃO DE TRAJETÓRIA', 14, 11);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Análise Aerodinâmica Balística - Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 17);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(59, 130, 246);
+    doc.text('INTEGRAÇÃO RUNGE-KUTTA (RK4) | ATMOSFERA ISA | MODELO DE ARRASTO TRANSONICO', 14, 22);
+
+    // KPI Cards Row 1 (Y = 32)
+    let y = 32;
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(14, y, 56, 18, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('APOGEU MÁXIMO', 18, y + 5);
+    doc.setFontSize(13);
+    doc.setTextColor(16, 185, 129); // Emerald
+    doc.text(`${trajectorySummary.maxAltitude} m`, 18, y + 13);
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(77, y, 56, 18, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('VELOCIDADE MÁXIMA', 81, y + 5);
+    doc.setFontSize(13);
+    doc.setTextColor(37, 99, 235); // Blue
+    doc.text(`${trajectorySummary.maxVelocity} m/s`, 81, y + 13);
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(140, y, 56, 18, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('ACELERAÇÃO PICO', 144, y + 5);
+    doc.setFontSize(13);
+    doc.setTextColor(217, 119, 6); // Amber
+    doc.text(`${trajectorySummary.maxGForce.toFixed(2)} G`, 144, y + 13);
+
+    y += 22;
+
+    // KPI Cards Row 2
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(14, y, 56, 16, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MACH MÁXIMO', 18, y + 5);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Mach ${trajectorySummary.maxMach.toFixed(2)}`, 18, y + 12);
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(77, y, 56, 16, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('TEMPO ATÉ APOGEU', 81, y + 5);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${trajectorySummary.timeToApogee} s`, 81, y + 12);
+
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(140, y, 56, 16, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('TEMPO TOTAL VOO', 144, y + 5);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${trajectorySummary.totalFlightTime} s`, 144, y + 12);
+
+    y += 22;
+
+    // Section 1: Rocket & Launch Physics Parameters
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('1. PARÂMETROS FÍSICOS DO FOGUETE E LANÇAMENTO', 14, y);
+    y += 3;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(14, y, 196, y);
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+
+    const col1X = 14;
+    const col2X = 105;
+
+    const leftParams = [
+      `• Massa Inicial (Úmida): ${params.massInitial} kg`,
+      `• Massa Seca (Burnout): ${params.massFinal} kg`,
+      `• Impulso Total do Motor: ${params.motorImpulse} N·s (Classe ${trajectorySummary.motorClass})`,
+      `• Empuxo Máximo do Motor: ${params.motorThrust} N`,
+      `• Tempo de Queima: ${params.burnTime} s`,
+      `• Calibre / Diâmetro: ${(params.diameter * 1000).toFixed(0)} mm`,
+      `• Coeficiente de Arrasto (Cd0): ${params.cd}`
+    ];
+
+    const rightParams = [
+      `• Ângulo de Lançamento: ${params.launchAngle}°`,
+      `• Comprimento da Rampa: ${params.railLength} m`,
+      `• Vento em Solo: ${params.windSpeed} km/h`,
+      `• Paraquedas Drogue: ${(params.drogueDiameter * 100).toFixed(0)} cm (Cd: ${params.drogueCd})`,
+      `• Paraquedas Principal: ${(params.mainDiameter * 100).toFixed(0)} cm (Cd: ${params.mainCd})`,
+      `• Altura Deploy Principal: ${params.mainDeployAlt} m`,
+      `• Margem Estática Inicial/Burnout: ${trajectorySummary.staticMarginInitial.toFixed(2)} cal / ${trajectorySummary.staticMarginBurnout.toFixed(2)} cal`
+    ];
+
+    let pY = y;
+    leftParams.forEach((p) => {
+      doc.text(p, col1X, pY);
+      pY += 4;
+    });
+
+    pY = y;
+    rightParams.forEach((p) => {
+      doc.text(p, col2X, pY);
+      pY += 4;
+    });
+
+    y = pY + 3;
+
+    // Section 2: Milestones
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('2. MARCOS DAS FASES DE VOO (MILESTONES)', 14, y);
+    y += 3;
+    doc.line(14, y, 196, y);
+    y += 5;
+
+    // Table Header
+    doc.setFillColor(30, 41, 59);
+    doc.rect(14, y, 182, 5.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FASE DE VOO', 18, y + 3.8);
+    doc.text('TEMPO (s)', 75, y + 3.8);
+    doc.text('ALTITUDE (m)', 115, y + 3.8);
+    doc.text('VELOCIDADE (m/s)', 155, y + 3.8);
+
+    y += 5.5;
+
+    const milestones = [
+      { phase: 'Saída da Rampa (Rail Exit)', time: (Math.sqrt((2 * params.railLength) / (params.motorThrust / params.massInitial))).toFixed(2), alt: (params.railLength * Math.sin(params.launchAngle * Math.PI / 180)).toFixed(1), vel: trajectorySummary.railExitVelocity.toFixed(1) },
+      { phase: 'Término da Queima (Burnout)', time: params.burnTime.toFixed(2), alt: (trajectoryData.find(p => p.time >= params.burnTime)?.altitude || 0).toFixed(1), vel: (trajectoryData.find(p => p.time >= params.burnTime)?.velocity || 0).toFixed(1) },
+      { phase: 'Pressão Dinâmica Máxima (q_max)', time: trajectorySummary.timeMaxQ.toFixed(2), alt: (trajectoryData.find(p => p.time >= trajectorySummary.timeMaxQ)?.altitude || 0).toFixed(1), vel: (trajectoryData.find(p => p.time >= trajectorySummary.timeMaxQ)?.velocity || 0).toFixed(1) },
+      { phase: 'Apogeu (Ejeção Drogue)', time: trajectorySummary.timeToApogee.toFixed(2), alt: trajectorySummary.maxAltitude.toFixed(1), vel: '0.0' },
+      { phase: 'Deploy Paraquedas Principal', time: (trajectoryData.find(p => p.phase === 'main_chute')?.time || 0).toFixed(2), alt: (trajectoryData.find(p => p.phase === 'main_chute')?.altitude || params.mainDeployAlt).toFixed(1), vel: (trajectoryData.find(p => p.phase === 'main_chute')?.velocity || 0).toFixed(1) },
+      { phase: 'Pouso no Solo (Touchdown)', time: trajectorySummary.totalFlightTime.toFixed(2), alt: '0.0', vel: trajectorySummary.touchdownVelocity.toFixed(1) }
+    ];
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    milestones.forEach((m, i) => {
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, y, 182, 5, 'F');
+      }
+      doc.setTextColor(30, 41, 59);
+      doc.text(m.phase, 18, y + 3.5);
+      doc.text(`${m.time} s`, 75, y + 3.5);
+      doc.text(`${m.alt} m`, 115, y + 3.5);
+      doc.text(`${m.vel} m/s`, 155, y + 3.5);
+      y += 5;
+    });
+
+    y += 5;
+
+    // Section 3: Telemetry Data Points
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('3. TELEMETRIA AMOSTRADA DA TRAJETÓRIA', 14, y);
+    y += 3;
+    doc.line(14, y, 196, y);
+    y += 5;
+
+    // Header for telemetry
+    doc.setFillColor(30, 41, 59);
+    doc.rect(14, y, 182, 5.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tempo(s)', 16, y + 3.8);
+    doc.text('Alt(m)', 42, y + 3.8);
+    doc.text('Vel(m/s)', 68, y + 3.8);
+    doc.text('Acel(G)', 94, y + 3.8);
+    doc.text('Mach', 120, y + 3.8);
+    doc.text('Massa(kg)', 146, y + 3.8);
+    doc.text('Fase', 170, y + 3.8);
+
+    y += 5.5;
+
+    const sampleCount = 20;
+    const step = Math.max(1, Math.floor(trajectoryData.length / sampleCount));
+    const samplePoints = [];
+    for (let i = 0; i < trajectoryData.length; i += step) {
+      samplePoints.push(trajectoryData[i]);
+    }
+    if (samplePoints[samplePoints.length - 1] !== trajectoryData[trajectoryData.length - 1]) {
+      samplePoints.push(trajectoryData[trajectoryData.length - 1]);
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+
+    samplePoints.forEach((pt, idx) => {
+      if (y > 275) {
+        doc.addPage();
+        y = 15;
+        doc.setFillColor(30, 41, 59);
+        doc.rect(14, y, 182, 5.5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Tempo(s)', 16, y + 3.8);
+        doc.text('Alt(m)', 42, y + 3.8);
+        doc.text('Vel(m/s)', 68, y + 3.8);
+        doc.text('Acel(G)', 94, y + 3.8);
+        doc.text('Mach', 120, y + 3.8);
+        doc.text('Massa(kg)', 146, y + 3.8);
+        doc.text('Fase', 170, y + 3.8);
+        y += 5.5;
+        doc.setFont('helvetica', 'normal');
+      }
+
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, y, 182, 4.5, 'F');
+      }
+
+      doc.setTextColor(30, 41, 59);
+      doc.text(`${pt.time.toFixed(1)}s`, 16, y + 3.2);
+      doc.text(`${pt.altitude.toFixed(1)}m`, 42, y + 3.2);
+      doc.text(`${pt.velocity.toFixed(1)}`, 68, y + 3.2);
+      doc.text(`${pt.acceleration.toFixed(1)}`, 94, y + 3.2);
+      doc.text(`${pt.mach.toFixed(2)}`, 120, y + 3.2);
+      doc.text(`${pt.currentMass.toFixed(2)}`, 146, y + 3.2);
+      doc.text(`${pt.phase}`, 170, y + 3.2);
+
+      y += 4.5;
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text(`BAR-AEB Aerodinâmica & Aviônica | Página ${p} de ${totalPages}`, 14, 290);
+      doc.text('Documento gerado automaticamente pelo Simulador de Trajetória', 115, 290);
+    }
+
+    doc.save(`relatorio_simulacao_foguete_${Date.now()}.pdf`);
+  };
+
   return (
     <div className="space-y-5">
       {/* Top Banner Header */}
@@ -133,10 +416,19 @@ export const FlightSimulator: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 text-white border border-red-500/50 text-xs px-3 py-1.5 rounded font-mono font-bold transition shadow cursor-pointer active:scale-95"
+            title="Exportar Relatório Completo em PDF"
+          >
+            <FileText className="w-3.5 h-3.5 text-red-200" />
+            Exportar Relatório PDF
+          </button>
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 light:bg-slate-200 light:hover:bg-slate-300 text-slate-200 dark:text-slate-200 light:text-slate-800 border border-slate-700 dark:border-slate-700 light:border-slate-300 text-xs px-3 py-1.5 rounded font-mono font-bold transition shadow"
+            className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 light:bg-slate-200 light:hover:bg-slate-300 text-slate-200 dark:text-slate-200 light:text-slate-800 border border-slate-700 dark:border-slate-700 light:border-slate-300 text-xs px-3 py-1.5 rounded font-mono font-bold transition shadow cursor-pointer active:scale-95"
+            title="Exportar Telemetria Bruta em CSV"
           >
             <Download className="w-3.5 h-3.5 text-blue-400" />
             Exportar CSV

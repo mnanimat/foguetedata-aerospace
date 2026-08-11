@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SUBSYSTEMS_DATA } from '../data/knowledgeData';
+import { PcbStudio2D3D } from './PcbStudio2D3D';
 import { 
   Cpu, Flame, Layers, ShieldCheck, Zap, Code, CheckCircle, ExternalLink, Box, Download, Sparkles,
   Play, Square, Radio, Activity, Gauge, Terminal, Copy, RotateCcw, Scissors, Sliders,
@@ -745,6 +746,9 @@ export const SubsystemsDetail: React.FC = () => {
         </div>
 
       </div>
+
+      {/* ESTÚDIO E DESIGNER DE PCB 2D & 3D COM EXPORTAÇÃO/IMPORTAÇÃO */}
+      <PcbStudio2D3D />
     </div>
   );
 };
