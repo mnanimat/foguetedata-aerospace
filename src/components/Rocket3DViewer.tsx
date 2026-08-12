@@ -1148,7 +1148,7 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
 
       {/* Anatomy Explorer Subsystems Detailed Panel */}
       {isAnatomyMode && (
-        <div className="bg-[#05070A] p-5 rounded-2xl border border-cyan-500/30 shadow-2xl space-y-4">
+        <div className="bg-[#05070A] p-4 sm:p-5 lg:p-6 rounded-2xl border border-cyan-500/30 shadow-2xl space-y-4 lg:space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-purple-600/20 text-purple-400 rounded-lg border border-purple-500/40">
@@ -1187,27 +1187,27 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
                     setActiveAnatomyId(part.id);
                     if (onSelectSubsystem) onSelectSubsystem(part.id);
                   }}
-                  className={`p-2 md:p-2.5 rounded-xl border transition cursor-pointer flex flex-col items-center md:items-start md:text-left gap-1.5 min-w-0 ${
+                  className={`p-2 md:p-2.5 lg:p-3 rounded-xl border transition cursor-pointer flex flex-col items-center justify-center md:items-start md:justify-start lg:items-center lg:justify-center gap-1.5 min-w-0 ${
                     isActive
                       ? 'bg-gradient-to-b from-cyan-900/40 to-purple-900/40 border-cyan-400 shadow-lg ring-1 ring-cyan-400/50'
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
                   }`}
                   title={part.name}
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1.5 justify-center md:justify-start w-full md:w-auto">
+                  <div className="flex items-center justify-between w-full lg:justify-center">
+                    <div className="flex items-center gap-1.5 justify-center md:justify-start lg:justify-center w-full md:w-auto lg:w-full">
                       <span
-                        className="w-2 h-2 rounded-full hidden md:inline-block"
+                        className="w-2 h-2 rounded-full hidden md:inline-block lg:hidden xl:inline-block"
                         style={{ backgroundColor: part.colorHex }}
                       />
                       <div className="text-cyan-400">
                         {getPartIcon(part.id, "w-4 h-4")}
                       </div>
                     </div>
-                    <span className="text-[9px] font-mono text-slate-400 uppercase hidden lg:inline">{part.category}</span>
+                    <span className="text-[9px] font-mono text-slate-400 uppercase hidden lg:hidden xl:inline">{part.category}</span>
                   </div>
-                  {/* Full label on larger screens */}
-                  <span className="text-[10px] md:text-xs font-mono font-bold text-white line-clamp-1 hidden sm:block">
+                  {/* Full label on larger screens, hidden on lg screen (tight column 1/3 layout) to prevent squeeze */}
+                  <span className="text-[10px] md:text-xs font-mono font-bold text-white line-clamp-1 hidden sm:block lg:hidden xl:block">
                     {part.shortLabel}
                   </span>
                   {/* Single word on mobile to guarantee layout doesn't overflow */}
