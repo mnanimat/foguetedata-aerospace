@@ -26,17 +26,26 @@ export interface TrajectorySummary {
   motorClass: string; // e.g., "G64" or "H128"
 }
 
-// Calculates Standard International Atmosphere (ISA) parameters
-export function getAtmosphericProperties(altitude: number, groundTempC: number = 25, groundPressHpa: number = 1013.25) {
-  const h = Math.max(0, altitude);
-  const T0 = groundTempC + 273.15; // Kelvin
-  const P0 = groundPressHpa * 100; // Pascals
+// Calculates Standard International Atmosphere (ISA) parameters with site elevation MSL
+export function getAtmosphericProperties(
+  altitude: number,
+  groundTempC: number = 25,
+  groundPressHpa: number = 1013.25,
+  elevationMSL: number = 0
+) {
+  const hGroundMSL = Math.max(0, elevationMSL);
+  const hTotal = Math.max(0, hGroundMSL + altitude);
+  const T0 = groundTempC + 273.15; // Kelvin at sea level ground
+  const P0 = groundPressHpa * 100; // Pascals at ground level
   const L = 0.0065; // K/m lapse rate
   const g0 = 9.80665;
   const R = 287.058; // J/(kg*K)
   const gamma = 1.4;
 
-  const T = Math.max(180, T0 - L * h);
+  // Temperature at local ground elevation MSL + altitude above rail
+  const T = Math.max(180, T0 - L * hTotal);
+  
+  // Barometric pressure formula taking launch site MSL elevation into account
   const P = P0 * Math.pow(T / T0, g0 / (R * L));
   const rho = P / (R * T);
   const soundSpeed = Math.sqrt(gamma * R * T);
@@ -87,6 +96,7 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
 
   const angleRad = (params.launchAngle * Math.PI) / 180;
   const windMps = (params.windSpeed * 1000) / 3600;
+  const windDirRad = (((params.windDirection ?? 90) - 90) * Math.PI) / 180; // Heading offset relative to 90deg East launch azimuth
 
   const mPropellant = Math.max(0.001, params.massInitial - params.massFinal);
   const burnRate = mPropellant / params.burnTime;
@@ -120,6 +130,7 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
   let drogueAlt = 0;
   let mainAlt = 0;
   let driftDist = 0;
+  let z = 0; // 3D Crossrange distance (North/South)
 
   const points: TrajectoryPoint[] = [];
 
@@ -127,13 +138,15 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
     // Current Gravity at altitude
     const gAcc = g0 * Math.pow(Re / (Re + y), 2);
 
-    // Current Atmospheric Properties
-    const atmos = getAtmosphericProperties(y, params.temperatureGround, params.pressureGround);
+    // Current Atmospheric Properties with Elevation MSL
+    const atmos = getAtmosphericProperties(y, params.temperatureGround, params.pressureGround, params.elevationMSL || 0);
     const rho = atmos.rho;
     const aSound = atmos.soundSpeed;
 
-    // Wind at Altitude (Hellman Power Law)
+    // Wind at Altitude (Hellman Power Law & Direction Vector)
     const vWindAlt = windMps * Math.pow(Math.max(y, 0.5) / 10, 0.143);
+    const vWindAltX = vWindAlt * Math.cos(windDirRad);
+    const vWindAltZ = vWindAlt * Math.sin(windDirRad);
 
     // Thrust & Propellant Mass Elapsed
     const tBurn = t - thrustStartDelay;
@@ -153,10 +166,10 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
       thrust = (Math.PI / 2) * avgThrust * Math.sin((Math.PI * tBurn) / burnTime);
     }
 
-    // Velocity relative to wind
-    const vxRel = vx - vWindAlt;
+    // Velocity relative to wind vector
+    const vxRel = vx - vWindAltX;
     const vyRel = vy;
-    const vRel = Math.sqrt(vxRel * vxRel + vyRel * vyRel);
+    const vRel = Math.sqrt(vxRel * vxRel + vyRel * vyRel + vWindAltZ * vWindAltZ);
     const vGround = Math.sqrt(vx * vx + vy * vy);
 
     const mach = vGround / aSound;
@@ -233,8 +246,11 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
       fx = currentM * accelAlongRail * Math.cos(angleRad);
       fy = currentM * accelAlongRail * Math.sin(angleRad);
     } else if (phase === 'thrust') {
-      // Rocket orientation along flight path angle
-      const pitchAngle = vGround > 0.1 ? Math.atan2(vy, vx) : angleRad;
+      // Rocket orientation along flight path angle with weathercocking effect into crosswind
+      let pitchAngle = vGround > 0.1 ? Math.atan2(vy, vx) : angleRad;
+      const weathercockOffset = Math.atan2(vWindAltX, Math.max(vGround, 2.0));
+      pitchAngle = pitchAngle - 0.2 * weathercockOffset;
+
       const dragX = vRel > 0 ? dragForce * (vxRel / vRel) : 0;
       const dragY = vRel > 0 ? dragForce * (vyRel / vRel) : 0;
 
@@ -265,7 +281,7 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
 
     // Accumulate Drift during Descent
     if (vy < 0) {
-      driftDist += vWindAlt * dt;
+      driftDist += Math.sqrt(vWindAltX * vWindAltX + vWindAltZ * vWindAltZ) * dt;
     }
 
     // Record Point every ~0.06s (to keep ~200-400 points for chart)
@@ -278,6 +294,7 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
         phase,
         xPos: parseFloat(x.toFixed(2)),
         yPos: parseFloat(Math.max(0, y).toFixed(2)),
+        zPos: parseFloat(z.toFixed(2)),
         mach: parseFloat(mach.toFixed(3)),
         dynamicPressure: parseFloat(dynPress.toFixed(1)),
         dragForce: parseFloat(dragForce.toFixed(1)),
@@ -294,6 +311,7 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
     vy += ay * dt;
     x += vx * dt;
     y += vy * dt;
+    z += vWindAltZ * dt;
     t += dt;
 
     if (y < 0) break;

@@ -8,7 +8,28 @@ export type ActiveTab =
   | 'team'
   | 'community'
   | 'cad_repository'
+  | 'satellite'
   | 'legal';
+
+export interface SatellitePayloadConfig {
+  id: string;
+  name: string;
+  formFactor: '1U' | '2U' | '3U' | '6U' | 'PocketQube' | 'CustomCanister';
+  totalMassKg: number;
+  widthCm: number;
+  heightCm: number;
+  lengthCm: number;
+  structureMaterial: 'aluminum_6061' | 'carbon_fiber' | 'titanium';
+  solarCellsType: 'triple_junction_gaas' | 'silicon_monocrystalline' | 'none';
+  deployableSolarWings: boolean;
+  batteryCapacityWh: number;
+  obcProcessor: string;
+  commBand: 'UHF/VHF' | 'S-Band' | 'X-Band';
+  adcsType: 'passive_magnet' | 'magnetorquers_3axis' | 'reaction_wheels_3axis';
+  payloadSensors: string[];
+  powerConsumptionW: number;
+  solarGenerationW: number;
+}
 
 export interface CadResource {
   id: string;
@@ -44,6 +65,15 @@ export interface RocketParams {
   pressureGround: number; // hPa (Ground level atmospheric pressure)
   cgPosition: number; // cm from nosecone tip
   cpPosition: number; // cm from nosecone tip
+  finSpan: number; // cm (Fin span / envergadura)
+  finShape: 'trapezoidal' | 'elliptical'; // Fin shape
+  finAngleOfAttack: number; // degrees
+  trajectoryLineVisible: boolean;
+  trajectoryLineThickness: number;
+  trajectoryLineDashed: boolean;
+  noseShape: 'parabolic' | 'conical' | 'ogive' | 'vonkarman';
+  noseLength: number; // cm
+  bodyLength: number; // cm
   drogueDiameter: number; // m (Drogue parachute diameter)
   drogueCd: number; // Drogue chute drag coefficient
   mainDeployAlt: number; // m (Altitude to trigger main parachute)
@@ -52,6 +82,35 @@ export interface RocketParams {
   thrustStartDelay?: number; // s (Delay before engine thrust ignition, default 0s)
   parachuteDeployMode?: 'apogee_auto' | 'delay_after_apogee' | 'fixed_time'; // Parachute ejection timing mode
   parachuteDeployDelay?: number; // s (Delay in seconds for parachute ejection)
+  elevationMSL?: number; // m (Launch site elevation above mean sea level MSL)
+}
+
+export interface ParachuteConfig {
+  mainDiameter: number; // m
+  mainCd: number; // Cd
+  mainDeployAlt: number; // m
+  drogueDiameter: number; // m
+  drogueCd: number; // Cd
+  shroudLinesCount?: number;
+  canopyColor?: string;
+  canopyStyle?: 'domed_hemispherical' | 'cruciform' | 'toroidal' | 'elliptical';
+  deployDelaySec?: number;
+}
+
+export interface SimulationHistoryItem {
+  id: string;
+  timestamp: string;
+  name: string;
+  params: RocketParams;
+  maxAltitude: number;
+  maxVelocity: number;
+  maxMach: number;
+  maxAcceleration: number;
+  totalFlightTime: number;
+  driftDistance: number;
+  elevationMSL: number;
+  windSpeed: number;
+  windDirection: number;
 }
 
 export interface TrajectoryPoint {
@@ -60,8 +119,9 @@ export interface TrajectoryPoint {
   velocity: number; // m/s
   acceleration: number; // m/s²
   phase: 'ramp' | 'thrust' | 'coast' | 'drogue' | 'main_chute' | 'landed';
-  xPos: number; // m (downrange distance)
-  yPos: number; // m (altitude)
+  xPos: number; // m (downrange distance East/X)
+  yPos: number; // m (altitude Y)
+  zPos?: number; // m (crossrange distance North/Z)
   mach: number; // Mach number v / a(h)
   dynamicPressure: number; // Pa (q = 0.5 * rho * v^2)
   dragForce: number; // N

@@ -3,6 +3,9 @@ import { jsPDF } from 'jspdf';
 import { RocketParams } from '../types';
 import { calculatePreciseTrajectory, TrajectorySummary } from '../utils/rocketPhysics';
 import { Rocket3DViewer } from './Rocket3DViewer';
+import { FlightSimulator3DTrajectory } from './FlightSimulator3DTrajectory';
+import { SimulationHistoryPanel } from './SimulationHistoryPanel';
+import { SimulationHistoryItem } from '../types';
 import {
   Rocket,
   Play,
@@ -28,9 +31,895 @@ import {
   CheckCircle2,
   XCircle,
   Maximize2,
-  X
+  X,
+  Thermometer,
+  Navigation,
+  Activity
 } from 'lucide-react';
 import { getStoredFlightParams, saveStoredFlightParams } from '../utils/offlineCache';
+
+interface AtmosphericControlPanelProps {
+  params: RocketParams;
+  setParams: React.Dispatch<React.SetStateAction<RocketParams>>;
+  trajectorySummary: TrajectorySummary;
+}
+
+const AtmosphericControlPanel: React.FC<AtmosphericControlPanelProps> = ({
+  params,
+  setParams,
+  trajectorySummary
+}) => {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const getCardinalName = (deg: number): string => {
+    const normalized = ((deg % 360) + 360) % 360;
+    if (normalized >= 337.5 || normalized < 22.5) return 'Norte (N)';
+    if (normalized >= 22.5 && normalized < 67.5) return 'Nordeste (NE)';
+    if (normalized >= 67.5 && normalized < 112.5) return 'Leste (E)';
+    if (normalized >= 112.5 && normalized < 157.5) return 'Sudeste (SE)';
+    if (normalized >= 157.5 && normalized < 202.5) return 'Sul (S)';
+    if (normalized >= 202.5 && normalized < 247.5) return 'Sudoeste (SW)';
+    if (normalized >= 247.5 && normalized < 292.5) return 'Oeste (W)';
+    return 'Noroeste (NW)';
+  };
+
+  const groundTempK = (params.temperatureGround || 25) + 273.15;
+  const groundPressPa = (params.pressureGround || 1013.25) * 100;
+  const rho0 = groundPressPa / (287.058 * groundTempK);
+  const soundSpeed0 = Math.sqrt(1.4 * 287.058 * groundTempK);
+
+  const windMps = ((params.windSpeed || 0) * 1000) / 3600;
+  const windDirRad = (((params.windDirection ?? 90) - 90) * Math.PI) / 180;
+  const windAxialMps = windMps * Math.cos(windDirRad);
+  const windLateralMps = windMps * Math.sin(windDirRad);
+
+  return (
+    <div className="bg-[#111827] dark:bg-[#111827] light:bg-white border border-blue-500/30 rounded-xl p-4 shadow-xl space-y-4 transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-blue-600/20 rounded-lg text-blue-400 border border-blue-500/30">
+            <Wind className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100 dark:text-white light:text-slate-900 flex items-center gap-2 font-italic-title">
+              Painel de Configuração de Variáveis Atmosféricas & Ventos (ISA)
+            </h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 light:text-slate-600">
+              Ajuste a velocidade do vento, direção angular (Rosa dos Ventos), temperatura e pressão ISA para recalcular a trajetória e a deriva balística em tempo real.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="text-xs font-mono font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-slate-900 dark:bg-slate-900 light:bg-slate-100 px-2.5 py-1 rounded border border-slate-800 cursor-pointer"
+        >
+          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <span>{isOpen ? 'Ocultar Painel Atmosférico' : 'Configurar Ventos & Atmosfera'}</span>
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div className="lg:col-span-8 space-y-4">
+              {/* Wind Speed */}
+              <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-3.5 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-2">
+                <div className="flex justify-between items-center text-xs font-mono">
+                  <span className="font-bold text-cyan-400 flex items-center gap-1.5">
+                    <Wind className="w-4 h-4" />
+                    Velocidade do Vento no Solo
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-200 dark:text-slate-200 light:text-slate-800 font-bold">
+                      {params.windSpeed} km/h
+                    </span>
+                    <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
+                      ({windMps.toFixed(1)} m/s)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="80"
+                    step="1"
+                    value={params.windSpeed}
+                    onChange={(e) => setParams((prev) => ({ ...prev, windSpeed: parseFloat(e.target.value) || 0 }))}
+                    className="w-full accent-cyan-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={params.windSpeed}
+                    onChange={(e) => setParams((prev) => ({ ...prev, windSpeed: parseFloat(e.target.value) || 0 }))}
+                    className="w-20 bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-300 rounded px-2 py-1 text-xs text-center font-mono font-bold text-cyan-300 outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-mono mr-1">Presets:</span>
+                  {[
+                    { label: 'Calmo (0 km/h)', val: 0 },
+                    { label: 'Brisa (10 km/h)', val: 10 },
+                    { label: 'Moderado (25 km/h)', val: 25 },
+                    { label: 'Forte (40 km/h)', val: 40 },
+                    { label: 'Alerta AEB (60 km/h)', val: 60 }
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      onClick={() => setParams((prev) => ({ ...prev, windSpeed: p.val }))}
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded border transition cursor-pointer ${
+                        params.windSpeed === p.val
+                          ? 'bg-cyan-600 text-white border-cyan-400 font-bold'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Wind Direction */}
+              <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-3.5 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-2">
+                <div className="flex justify-between items-center text-xs font-mono">
+                  <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                    <Compass className="w-4 h-4 text-amber-400" />
+                    Direção do Vento (Rosa dos Ventos / Azimute)
+                  </span>
+                  <span className="text-amber-300 font-bold">
+                    {params.windDirection}° - {getCardinalName(params.windDirection ?? 90)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="5"
+                    value={params.windDirection ?? 90}
+                    onChange={(e) => setParams((prev) => ({ ...prev, windDirection: parseFloat(e.target.value) || 0 }))}
+                    className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="360"
+                    value={params.windDirection ?? 90}
+                    onChange={(e) => setParams((prev) => ({ ...prev, windDirection: parseFloat(e.target.value) || 0 }))}
+                    className="w-20 bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-300 rounded px-2 py-1 text-xs text-center font-mono font-bold text-amber-300 outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1 pt-1">
+                  {[
+                    { label: 'N (0°)', deg: 0 },
+                    { label: 'NE (45°)', deg: 45 },
+                    { label: 'E (90°)', deg: 90 },
+                    { label: 'SE (135°)', deg: 135 },
+                    { label: 'S (180°)', deg: 180 },
+                    { label: 'SW (225°)', deg: 225 },
+                    { label: 'W (270°)', deg: 270 },
+                    { label: 'NW (315°)', deg: 315 }
+                  ].map((card) => (
+                    <button
+                      key={card.deg}
+                      onClick={() => setParams((prev) => ({ ...prev, windDirection: card.deg }))}
+                      className={`text-[10px] font-mono py-1 rounded border transition text-center cursor-pointer ${
+                        params.windDirection === card.deg
+                          ? 'bg-amber-600 text-white border-amber-400 font-bold shadow'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {card.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Altitude MSL, Temperature & Pressure */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Altitude ASL (MSL) */}
+                <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-3.5 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="font-bold text-purple-400 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" /> Altitude Campo (MSL)
+                    </span>
+                    <span className="text-purple-300 font-bold">{params.elevationMSL || 0} m</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="4000"
+                    step="10"
+                    value={params.elevationMSL || 0}
+                    onChange={(e) => setParams((prev) => ({ ...prev, elevationMSL: parseFloat(e.target.value) || 0 }))}
+                    className="w-full accent-purple-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] font-mono text-slate-400 pt-0.5">
+                    <button onClick={() => setParams((prev) => ({ ...prev, elevationMSL: 0 }))} className="hover:text-white cursor-pointer">Nível do Mar (0m)</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, elevationMSL: 50 }))} className="hover:text-white cursor-pointer">Alcântara (50m)</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, elevationMSL: 800 }))} className="hover:text-white cursor-pointer">SP (800m)</button>
+                  </div>
+                </div>
+
+                {/* Temperature */}
+                <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-3.5 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="font-bold text-emerald-400 flex items-center gap-1">
+                      <Thermometer className="w-3.5 h-3.5" /> Temperatura Solo
+                    </span>
+                    <span className="text-emerald-300 font-bold">{params.temperatureGround}°C</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-10"
+                    max="50"
+                    step="1"
+                    value={params.temperatureGround}
+                    onChange={(e) => setParams((prev) => ({ ...prev, temperatureGround: parseFloat(e.target.value) || 0 }))}
+                    className="w-full accent-emerald-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] font-mono text-slate-400 pt-0.5">
+                    <button onClick={() => setParams((prev) => ({ ...prev, temperatureGround: 10 }))} className="hover:text-white cursor-pointer">10°C (Frio)</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, temperatureGround: 15 }))} className="hover:text-white cursor-pointer">15°C (ISA)</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, temperatureGround: 25 }))} className="hover:text-white cursor-pointer">25°C (Trop)</button>
+                  </div>
+                </div>
+
+                {/* Pressure */}
+                <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-3.5 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="font-bold text-blue-400 flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5" /> Pressão Solo
+                    </span>
+                    <span className="text-blue-300 font-bold">{params.pressureGround} hPa</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="850"
+                    max="1080"
+                    step="1"
+                    value={params.pressureGround}
+                    onChange={(e) => setParams((prev) => ({ ...prev, pressureGround: parseFloat(e.target.value) || 1013.25 }))}
+                    className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] font-mono text-slate-400 pt-0.5">
+                    <button onClick={() => setParams((prev) => ({ ...prev, pressureGround: 900 }))} className="hover:text-white cursor-pointer">900 hPa</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, pressureGround: 1013.25 }))} className="hover:text-white cursor-pointer">1013 ISA</button>
+                    <button onClick={() => setParams((prev) => ({ ...prev, pressureGround: 1020 }))} className="hover:text-white cursor-pointer">1020 hPa</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Compass Vector & ISA Metrics */}
+            <div className="lg:col-span-4 bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 flex flex-col items-center justify-between space-y-3 h-full">
+              <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1">
+                <Compass className="w-4 h-4" /> Bússola & Vetor de Vento
+              </span>
+
+              <div className="relative w-36 h-36 flex items-center justify-center">
+                <svg className="w-full h-full" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="54" fill="#090d16" stroke="#334155" strokeWidth="2" />
+                  <circle cx="60" cy="60" r="44" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="2 2" />
+
+                  <text x="60" y="16" fill="#ef4444" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">N</text>
+                  <text x="60" y="112" fill="#64748b" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">S</text>
+                  <text x="108" y="63" fill="#38bdf8" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">E</text>
+                  <text x="12" y="63" fill="#64748b" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">W</text>
+
+                  <line x1="60" y1="60" x2="100" y2="60" stroke="#10b981" strokeWidth="1.5" strokeDasharray="2 1" />
+
+                  <g transform={`rotate(${params.windDirection ?? 90}, 60, 60)`}>
+                    <line x1="60" y1="92" x2="60" y2="22" stroke="#f59e0b" strokeWidth="3" />
+                    <polygon points="60,14 54,26 66,26" fill="#f59e0b" />
+                    <circle cx="60" cy="60" r="4" fill="#ef4444" />
+                  </g>
+                </svg>
+
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="text-[10px] font-mono font-bold text-amber-300 bg-slate-900/90 px-1.5 py-0.5 rounded border border-amber-500/40">
+                    {params.windSpeed} km/h
+                  </span>
+                </div>
+              </div>
+
+              <div className="w-full space-y-1.5 text-[10px] font-mono border-t border-slate-800 pt-2">
+                <div className="flex justify-between text-slate-300">
+                  <span>Densidade do Ar (ρ₀):</span>
+                  <strong className="text-emerald-400">{rho0.toFixed(3)} kg/m³</strong>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Velocidade Som (a₀):</span>
+                  <strong className="text-blue-400">{soundSpeed0.toFixed(1)} m/s</strong>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Vento Axial / Lateral:</span>
+                  <strong className="text-cyan-400">{windAxialMps.toFixed(1)} / {windLateralMps.toFixed(1)} m/s</strong>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Deriva de Pouso Est.:</span>
+                  <strong className="text-amber-400">{trajectorySummary.driftDistance} m</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface AdvancedThrustCdStabilityPanelProps {
+  params: RocketParams;
+  setParams: React.Dispatch<React.SetStateAction<RocketParams>>;
+  trajectorySummary: TrajectorySummary;
+}
+
+const AdvancedThrustCdStabilityPanel: React.FC<AdvancedThrustCdStabilityPanelProps> = ({
+  params,
+  setParams,
+  trajectorySummary
+}) => {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const diameterCm = (params.diameter || 0.082) * 100;
+  const deltaXCm = params.cpPosition - params.cgPosition;
+  const staticMargin = diameterCm > 0 ? deltaXCm / diameterCm : 0;
+
+  let stabilityStatus = {
+    label: 'Idealmente Estável (Padrão BAR-AEB)',
+    badgeClass: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
+    colorHex: '#10b981',
+    description: 'A margem estática está na faixa ideal (1.0 a 2.5 calibres). O minifoguete manterá estabilidade passiva sem caturro ou giros indesejados.'
+  };
+
+  if (staticMargin < 1.0) {
+    stabilityStatus = {
+      label: 'SUB-ESTÁVEL / INSTÁVEL (Risco de Tombamento)',
+      badgeClass: 'bg-red-950/90 text-red-300 border-red-500/50 animate-pulse',
+      colorHex: '#ef4444',
+      description: 'CUIDADO: A distância CP - CG é menor que 1.0 calibre. O minifoguete pode sofrer instabilidade grave, tombamento na saída de rampa e voo caótico!'
+    };
+  } else if (staticMargin > 2.5) {
+    stabilityStatus = {
+      label: 'SUPER-ESTÁVEL (Sensibilidade a Vento Cruzado)',
+      badgeClass: 'bg-amber-950/90 text-amber-300 border-amber-500/50',
+      colorHex: '#f59e0b',
+      description: 'ALERTA: Margem estática > 2.5 calibres. O minifoguete responderá excessivamente ao vento cruzado, guinando acentuadamente contra o vento (Weathercocking).'
+    };
+  }
+
+  const propMassKg = Math.max(0.001, params.massInitial - params.massFinal);
+  const avgThrustN = params.burnTime > 0 ? params.motorImpulse / params.burnTime : 0;
+  const specificImpulseSec = params.motorImpulse / (propMassKg * 9.80665);
+  const peakTransonicCd = (params.cd * 1.85 + 0.12).toFixed(2);
+
+  return (
+    <div className="bg-[#111827] dark:bg-[#111827] light:bg-white border border-cyan-500/40 rounded-xl p-4 shadow-xl space-y-4 transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-cyan-600/20 rounded-lg text-cyan-400 border border-cyan-500/30">
+            <Sliders className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100 dark:text-white light:text-slate-900 flex items-center gap-2 font-italic-title">
+              Controles Avançados: Arraste (Cd), Empuxo do Motor & Estabilidade Estática
+            </h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 light:text-slate-600">
+              Ajuste fino do coeficiente de arrasto, curva de empuxo do motor e margem estática (CG vs CP).
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-slate-900 dark:bg-slate-900 light:bg-slate-100 px-2.5 py-1 rounded border border-slate-800 cursor-pointer"
+        >
+          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <span>{isOpen ? 'Ocultar Controles Avançados' : 'Ajustar Cd, Empuxo & Estabilidade'}</span>
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="space-y-5 text-xs font-mono">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-5">
+            {/* PANEL 1: DRAG COEFFICIENT (Cd) CONTROL */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">
+                  <Gauge className="w-4 h-4" />
+                  Coeficiente de Arrasto C_d
+                </span>
+                <span className="bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-bold">
+                  Cd₀ = {params.cd.toFixed(2)}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Arrasto Subsônico Base (Cd₀):</span>
+                  <span className="font-bold text-cyan-300">{params.cd.toFixed(2)}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0.15"
+                  max="1.20"
+                  step="0.01"
+                  value={params.cd}
+                  onChange={(e) => setParams({ ...params, cd: parseFloat(e.target.value) || 0.3 })}
+                  className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>0.15 (Super Aerodinâmico)</span>
+                  <span>1.20 (Alta Resistência)</span>
+                </div>
+              </div>
+
+              {/* Aerodynamic Presets */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] text-slate-400 font-bold block">Presets Aerodinâmicos:</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => setParams({ ...params, cd: 0.28 })}
+                    className={`p-1.5 rounded text-left border text-[10px] transition-all cursor-pointer ${
+                      params.cd === 0.28
+                        ? 'bg-cyan-900/60 border-cyan-400 text-cyan-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    🚀 Ogiva Polida (0.28)
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, cd: 0.42 })}
+                    className={`p-1.5 rounded text-left border text-[10px] transition-all cursor-pointer ${
+                      params.cd === 0.42
+                        ? 'bg-cyan-900/60 border-cyan-400 text-cyan-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    🎯 Padrão BAR-AEB (0.42)
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, cd: 0.52 })}
+                    className={`p-1.5 rounded text-left border text-[10px] transition-all cursor-pointer ${
+                      params.cd === 0.52
+                        ? 'bg-cyan-900/60 border-cyan-400 text-cyan-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    📐 Cônica Rugosa (0.52)
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, cd: 0.68 })}
+                    className={`p-1.5 rounded text-left border text-[10px] transition-all cursor-pointer ${
+                      params.cd === 0.68
+                        ? 'bg-cyan-900/60 border-cyan-400 text-cyan-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    📷 Câmera Bordo (0.68)
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 p-2.5 rounded border border-slate-800 space-y-1 text-[11px]">
+                <div className="flex justify-between text-slate-400">
+                  <span>Pico Transônico (Mach 1.05):</span>
+                  <span className="font-bold text-amber-400">Cd_peak ≈ {peakTransonicCd}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Calibre do Foguete (d):</span>
+                  <span className="font-bold text-slate-200">{diameterCm.toFixed(1)} cm ({(params.diameter * 1000).toFixed(0)} mm)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* PANEL 2: MOTOR THRUST & IGNITION CONTROL */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-amber-400 flex items-center gap-1.5 text-sm">
+                  <Rocket className="w-4 h-4" />
+                  Empuxo & Propulsão
+                </span>
+                <span className="bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">
+                  {params.motorThrust} N Pico
+                </span>
+              </div>
+
+              {/* Thrust Slider */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Empuxo Máximo/Pico (F_T):</span>
+                  <span className="font-bold text-amber-300">{params.motorThrust} N</span>
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="1500"
+                  step="5"
+                  value={params.motorThrust}
+                  onChange={(e) => setParams({ ...params, motorThrust: parseFloat(e.target.value) || 10 })}
+                  className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Impulse Slider */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Impulso Total (I_tot):</span>
+                  <span className="font-bold text-amber-300">{params.motorImpulse} N·s</span>
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="2000"
+                  step="5"
+                  value={params.motorImpulse}
+                  onChange={(e) => setParams({ ...params, motorImpulse: parseFloat(e.target.value) || 5 })}
+                  className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Burn Time Slider */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Tempo de Queima (t_burn):</span>
+                  <span className="font-bold text-amber-300">{params.burnTime.toFixed(2)} s</span>
+                </label>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="8.0"
+                  step="0.1"
+                  value={params.burnTime}
+                  onChange={(e) => setParams({ ...params, burnTime: parseFloat(e.target.value) || 0.5 })}
+                  className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Motor Presets */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-400 font-bold block">Presets de Motores Comerciais:</span>
+                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <button
+                    onClick={() => setParams({ ...params, motorThrust: 30, motorImpulse: 17.5, burnTime: 1.65 })}
+                    className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:border-amber-500/50 cursor-pointer"
+                  >
+                    Estes D12
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, motorThrust: 52, motorImpulse: 72, burnTime: 2.25 })}
+                    className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:border-amber-500/50 cursor-pointer"
+                  >
+                    Cesaroni F32
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, motorThrust: 210, motorImpulse: 260, burnTime: 2.3 })}
+                    className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:border-amber-500/50 cursor-pointer"
+                  >
+                    Minifoguete G64
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 p-2 rounded border border-slate-800 flex justify-between text-[11px] text-slate-400">
+                <span>Empuxo Médio F_avg: <strong className="text-amber-300">{avgThrustN.toFixed(1)} N</strong></span>
+                <span>I_sp: <strong className="text-amber-300">{specificImpulseSec.toFixed(0)} s</strong></span>
+              </div>
+            </div>
+
+            {/* PANEL 3: STABILITY ANALYSIS (CG vs CP & STATIC MARGIN) */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">
+                  <ShieldCheck className="w-4 h-4" />
+                  Estabilidade Estática (CG vs CP)
+                </span>
+                <span className={`px-2 py-0.5 rounded font-bold border text-[11px] ${stabilityStatus.badgeClass}`}>
+                  SM = {staticMargin.toFixed(2)} cal
+                </span>
+              </div>
+
+              {/* Status Badge */}
+              <div className={`p-2.5 rounded border ${stabilityStatus.badgeClass} space-y-1`}>
+                <div className="font-bold text-xs flex items-center gap-1.5">
+                  <span>{stabilityStatus.label}</span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed opacity-90">{stabilityStatus.description}</p>
+              </div>
+
+              {/* Sliders for CG & CP */}
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-slate-300 flex justify-between">
+                    <span>Centro de Gravidade (CG):</span>
+                    <span className="font-bold text-blue-400">{params.cgPosition} cm</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="5"
+                    max="150"
+                    step="1"
+                    value={params.cgPosition}
+                    onChange={(e) => setParams({ ...params, cgPosition: parseFloat(e.target.value) || 10 })}
+                    className="w-full accent-blue-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 flex justify-between">
+                    <span>Centro de Pressão Barrowman (CP):</span>
+                    <span className="font-bold text-amber-400">{params.cpPosition} cm</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="5"
+                    max="150"
+                    step="1"
+                    value={params.cpPosition}
+                    onChange={(e) => setParams({ ...params, cpPosition: parseFloat(e.target.value) || 20 })}
+                    className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Rocket Stability Schematic Diagram */}
+              <div className="bg-slate-950 p-2.5 rounded border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                  <span>Esquema de Posição Relativa:</span>
+                  <span>Distância ΔX = {(params.cpPosition - params.cgPosition).toFixed(1)} cm</span>
+                </div>
+
+                {/* Visual Bar */}
+                <div className="relative w-full h-8 bg-slate-900 rounded border border-slate-800 overflow-hidden flex items-center px-2">
+                  {/* Ideal Zone Highlight */}
+                  <div className="absolute top-0 bottom-0 left-1/4 right-1/4 bg-emerald-500/10 border-x border-emerald-500/30" />
+
+                  {/* Rocket Nose Tip */}
+                  <div className="text-[9px] font-bold text-slate-500 mr-2">O (Coifa)</div>
+
+                  {/* CG Pin */}
+                  <div
+                    className="absolute top-1 bottom-1 w-1 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/50"
+                    style={{ left: `${Math.min(85, Math.max(10, (params.cgPosition / 100) * 80))}%` }}
+                    title={`CG: ${params.cgPosition} cm`}
+                  >
+                    <span className="absolute -top-3 text-[9px] font-bold text-blue-400 bg-slate-900 px-1 rounded border border-blue-800">
+                      CG
+                    </span>
+                  </div>
+
+                  {/* CP Pin */}
+                  <div
+                    className="absolute top-1 bottom-1 w-1 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/50"
+                    style={{ left: `${Math.min(90, Math.max(15, (params.cpPosition / 100) * 80))}%` }}
+                    title={`CP: ${params.cpPosition} cm`}
+                  >
+                    <span className="absolute -bottom-3 text-[9px] font-bold text-amber-400 bg-slate-900 px-1 rounded border border-amber-800">
+                      CP
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-[10px] text-slate-400 pt-1">
+                  <span>Ideal BAR-AEB: 1.0 - 2.5 cal</span>
+                  <span className="font-bold text-slate-200">Margem Atual: {staticMargin.toFixed(2)} cal</span>
+                </div>
+              </div>
+            </div>
+
+            {/* PANEL 4: FINS (ALETAS) */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-indigo-400 flex items-center gap-1.5 text-sm">
+                  <Layers className="w-4 h-4" />
+                  Aletas & Aerodinâmica
+                </span>
+              </div>
+
+              {/* Span Slider */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Envergadura (Span):</span>
+                  <span className="font-bold text-indigo-300">{params.finSpan} cm</span>
+                </label>
+                <input
+                  type="range"
+                  min="3"
+                  max="20"
+                  step="0.5"
+                  value={params.finSpan}
+                  onChange={(e) => setParams({ ...params, finSpan: parseFloat(e.target.value) || 10 })}
+                  className="w-full accent-indigo-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Angle of Attack Slider */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between">
+                  <span>Ângulo de Ataque:</span>
+                  <span className="font-bold text-indigo-300">{params.finAngleOfAttack}°</span>
+                </label>
+                <input
+                  type="range"
+                  min="-5"
+                  max="5"
+                  step="0.5"
+                  value={params.finAngleOfAttack}
+                  onChange={(e) => setParams({ ...params, finAngleOfAttack: parseFloat(e.target.value) || 0 })}
+                  className="w-full accent-indigo-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Fin Shape Toggle */}
+              <div>
+                <label className="block text-slate-300 mb-2">
+                  <span>Formato (Shape):</span>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setParams({ ...params, finShape: 'trapezoidal' })}
+                    className={`flex-1 p-1.5 rounded border text-[10px] transition-all cursor-pointer ${
+                      params.finShape === 'trapezoidal'
+                        ? 'bg-indigo-900/60 border-indigo-400 text-indigo-200 font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    Trapezoidal
+                  </button>
+                  <button
+                    onClick={() => setParams({ ...params, finShape: 'elliptical' })}
+                    className={`flex-1 p-1.5 rounded border text-[10px] transition-all cursor-pointer ${
+                      params.finShape === 'elliptical'
+                        ? 'bg-indigo-900/60 border-indigo-400 text-indigo-200 font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    Elíptica
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PANEL 5: ESTRUTURA DO FOGUETE */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-pink-400 flex items-center gap-1.5 text-sm">
+                  <Rocket className="w-4 h-4" />
+                  Estrutura do Foguete
+                </span>
+              </div>
+
+              {/* Nose Length */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between items-center">
+                  <span>Tam. Coifa (cm):</span>
+                  <input
+                    type="number"
+                    value={params.noseLength}
+                    onChange={(e) => setParams({ ...params, noseLength: parseFloat(e.target.value) || 0 })}
+                    className="w-16 bg-slate-900 border border-slate-700 text-pink-300 font-bold px-1 py-0.5 rounded text-right text-xs"
+                  />
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="1"
+                  value={params.noseLength}
+                  onChange={(e) => setParams({ ...params, noseLength: parseFloat(e.target.value) || 40 })}
+                  className="w-full accent-pink-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Body Length */}
+              <div>
+                <label className="block text-slate-300 mb-1 flex justify-between items-center">
+                  <span>Tam. Tubo (cm):</span>
+                  <input
+                    type="number"
+                    value={params.bodyLength}
+                    onChange={(e) => setParams({ ...params, bodyLength: parseFloat(e.target.value) || 0 })}
+                    className="w-16 bg-slate-900 border border-slate-700 text-pink-300 font-bold px-1 py-0.5 rounded text-right text-xs"
+                  />
+                </label>
+                <input
+                  type="range"
+                  min="20"
+                  max="300"
+                  step="1"
+                  value={params.bodyLength}
+                  onChange={(e) => setParams({ ...params, bodyLength: parseFloat(e.target.value) || 100 })}
+                  className="w-full accent-pink-400 h-1.5 bg-slate-800 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* Nose Shape Toggle */}
+              <div>
+                <label className="block text-slate-300 mb-2">
+                  <span>Formato da Coifa:</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['parabolic', 'conical', 'ogive', 'vonkarman'].map((shape) => (
+                    <button
+                      key={shape}
+                      onClick={() => setParams({ ...params, noseShape: shape as any })}
+                      className={`p-1.5 rounded border text-[10px] transition-all cursor-pointer ${
+                        params.noseShape === shape
+                          ? 'bg-pink-900/60 border-pink-400 text-pink-200 font-bold'
+                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      {shape === 'parabolic' ? 'Parabólica' : shape === 'conical' ? 'Cônica' : shape === 'ogive' ? 'Ogiva' : 'Von Karman'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* PANEL 6: OPÇÕES VISUAIS DA TRAJETÓRIA */}
+            <div className="bg-[#05070A] dark:bg-[#05070A] light:bg-slate-50 p-4 rounded-lg border border-slate-800 dark:border-slate-800 light:border-slate-300 space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-teal-400 flex items-center gap-1.5 text-sm">
+                  <Activity className="w-4 h-4" />
+                  Visual da Trajetória
+                </span>
+              </div>
+
+              {/* Toggle Line Visibility */}
+              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={params.trajectoryLineVisible}
+                  onChange={(e) => setParams({ ...params, trajectoryLineVisible: e.target.checked })}
+                  className="accent-teal-400"
+                />
+                <span className="text-xs">Exibir Linha de Trajetória</span>
+              </label>
+
+              {/* Toggle Dashed Line */}
+              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={params.trajectoryLineDashed}
+                  onChange={(e) => setParams({ ...params, trajectoryLineDashed: e.target.checked })}
+                  className="accent-teal-400"
+                  disabled={!params.trajectoryLineVisible}
+                />
+                <span className={`text-xs ${!params.trajectoryLineVisible ? 'opacity-50' : ''}`}>Linha Tracejada</span>
+              </label>
+
+              {/* Line Thickness */}
+              <div>
+                <label className={`block text-slate-300 mb-1 flex justify-between items-center ${!params.trajectoryLineVisible ? 'opacity-50' : ''}`}>
+                  <span>Espessura:</span>
+                  <span className="font-bold text-teal-300">{params.trajectoryLineThickness}px</span>
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value={params.trajectoryLineThickness}
+                  onChange={(e) => setParams({ ...params, trajectoryLineThickness: parseFloat(e.target.value) || 2 })}
+                  disabled={!params.trajectoryLineVisible}
+                  className="w-full accent-teal-400 h-1.5 bg-slate-800 rounded cursor-pointer disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DEFAULT_FLIGHT_PARAMS: RocketParams = {
   massInitial: 1.45, // kg total wet mass
@@ -48,6 +937,15 @@ const DEFAULT_FLIGHT_PARAMS: RocketParams = {
   pressureGround: 1013.25, // hPa
   cgPosition: 44, // cm from nosecone tip
   cpPosition: 62, // cm from nosecone tip
+  finSpan: 10, // cm
+  finShape: 'trapezoidal',
+  finAngleOfAttack: 0, // degrees
+  trajectoryLineVisible: true,
+  trajectoryLineThickness: 2,
+  trajectoryLineDashed: true,
+  noseShape: 'parabolic',
+  noseLength: 40,
+  bodyLength: 100,
   drogueDiameter: 0.35, // m drogue chute diameter
   drogueCd: 1.5, // drogue chute drag coefficient
   mainDeployAlt: 150, // m main deployment altitude
@@ -63,11 +961,78 @@ export const FlightSimulator: React.FC = () => {
     saveStoredFlightParams(params);
   }, [params]);
 
-  const [activeSubTab, setActiveSubTab] = useState<'sim' | 'params' | 'formulas'>('sim');
+  React.useEffect(() => {
+    // Dynamic Barrowman CP estimation based on fin geometry
+    const baseCP = 55; // Base CP without fins variation
+    const finSpanShift = (params.finSpan - 10) * 1.2; // Larger span moves CP backwards
+    const finShapeShift = params.finShape === 'elliptical' ? -1.5 : 0; 
+    const angleShift = Math.abs(params.finAngleOfAttack) * -0.4; 
+
+    const computedCp = Math.max(10, Math.min(150, Math.round(baseCP + finSpanShift + finShapeShift + angleShift)));
+    
+    setParams(prev => {
+      if (prev.cpPosition !== computedCp) {
+        return { ...prev, cpPosition: computedCp };
+      }
+      return prev;
+    });
+  }, [params.finSpan, params.finShape, params.finAngleOfAttack]);
+
+  const [activeSubTab, setActiveSubTab] = useState<'sim' | 'trajectory3d' | 'params' | 'formulas'>('sim');
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
   const [showAdvancedFormulas, setShowAdvancedFormulas] = useState(true);
   const [isTrajectoryExpanded, setIsTrajectoryExpanded] = useState(false);
+  const [show3DTrajectoryTab, setShow3DTrajectoryTab] = useState(false);
+
+  // History State for storing the last 5 simulations
+  const [history, setHistory] = useState<SimulationHistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('bar_aeb_simulation_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleSaveCurrentSimulation = () => {
+    const newItem: SimulationHistoryItem = {
+      id: Date.now().toString(),
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      name: `Simulação #${history.length + 1}`,
+      params: { ...params },
+      maxAltitude: trajectorySummary.maxAltitude,
+      maxVelocity: trajectorySummary.maxVelocity,
+      maxMach: trajectorySummary.maxMach,
+      maxAcceleration: trajectorySummary.maxAcceleration,
+      totalFlightTime: trajectorySummary.totalFlightTime,
+      driftDistance: trajectorySummary.driftDistance,
+      elevationMSL: params.elevationMSL || 0,
+      windSpeed: params.windSpeed,
+      windDirection: params.windDirection ?? 90
+    };
+
+    const updated = [newItem, ...history].slice(0, 5); // Keep last 5
+    setHistory(updated);
+    try {
+      localStorage.setItem('bar_aeb_simulation_history', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem('bar_aeb_simulation_history');
+    } catch {}
+  };
+
+  const handleDeleteHistoryItem = (id: string) => {
+    const updated = history.filter((item) => item.id !== id);
+    setHistory(updated);
+    try {
+      localStorage.setItem('bar_aeb_simulation_history', JSON.stringify(updated));
+    } catch {}
+  };
 
   // Execute High-Precision Physics Simulation Integration
   const trajectorySummary: TrajectorySummary = useMemo(() => {
@@ -133,7 +1098,7 @@ export const FlightSimulator: React.FC = () => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.text('PROJETO BAR-AEB - RELATÓRIO TÉCNICO DE SIMULAÇÃO DE TRAJETÓRIA', 14, 11);
+    doc.text('FOGUETEDATA AEROSPACE - RELATÓRIO TÉCNICO DE SIMULAÇÃO DE TRAJETÓRIA', 14, 11);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
@@ -392,7 +1357,7 @@ export const FlightSimulator: React.FC = () => {
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(148, 163, 184);
-      doc.text(`BAR-AEB Aerodinâmica & Aviônica | Página ${p} de ${totalPages}`, 14, 290);
+      doc.text(`FogueteData Aerospace | Página ${p} de ${totalPages}`, 14, 290);
       doc.text('Documento gerado automaticamente pelo Simulador de Trajetória', 115, 290);
     }
 
@@ -437,7 +1402,7 @@ export const FlightSimulator: React.FC = () => {
       </div>
 
       {/* Sub-tab Switcher Navigation */}
-      <div className="flex space-x-2 border-b border-slate-800 dark:border-slate-800 light:border-slate-300 pb-1">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 dark:border-slate-800 light:border-slate-300 pb-1">
         <button
           onClick={() => setActiveSubTab('sim')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold font-mono transition ${
@@ -448,6 +1413,18 @@ export const FlightSimulator: React.FC = () => {
         >
           <Rocket className="w-3.5 h-3.5" />
           <span>Trajetória do Foguete</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('trajectory3d' as any)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold font-mono transition ${
+            (activeSubTab as string) === 'trajectory3d'
+              ? 'bg-cyan-600 text-white shadow ring-2 ring-cyan-400/50'
+              : 'text-slate-400 dark:text-slate-400 light:text-slate-600 hover:bg-slate-800/40'
+          }`}
+        >
+          <Navigation className="w-3.5 h-3.5 text-cyan-300" />
+          <span>Visualização 3D da Trajetória (Curva 3D WebGL)</span>
         </button>
 
         <button
@@ -478,6 +1455,9 @@ export const FlightSimulator: React.FC = () => {
       {/* TAB 1: TRAJECTORY & SIMULATION ANALYTICS */}
       {activeSubTab === 'sim' && (
         <div className="space-y-5">
+          {/* Realtime Atmospheric Variables & Wind Configuration Panel */}
+          <AtmosphericControlPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+
           {/* Executive Key Physics Indicators (KPI Grid) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* Apogee */}
@@ -582,7 +1562,10 @@ export const FlightSimulator: React.FC = () => {
                   BAR-AEB Calibre {params.diameter * 1000}mm
                 </span>
               </div>
-              <Rocket3DViewer autoDeployParachute={currentPoint ? (currentPoint.time > trajectorySummary.timeToApogee) : false} />
+              <Rocket3DViewer 
+                autoDeployParachute={currentPoint ? (currentPoint.time > trajectorySummary.timeToApogee) : false} 
+                rocketParams={params}
+              />
             </div>
 
             {/* Trajectory Flight Profile Chart Visualizer */}
@@ -803,12 +1786,48 @@ export const FlightSimulator: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Simulation History Panel (Last 5 Simulations) */}
+          <AdvancedThrustCdStabilityPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+          <SimulationHistoryPanel
+            history={history}
+            onSaveCurrent={handleSaveCurrentSimulation}
+            onLoadParams={(newParams) => setParams(newParams)}
+            onClearHistory={handleClearHistory}
+            onDeleteHistoryItem={handleDeleteHistoryItem}
+            currentApogee={trajectorySummary.maxAltitude}
+            currentMaxVel={trajectorySummary.maxVelocity}
+          />
+        </div>
+      )}
+
+      {/* TAB: 3D TRAJECTORY VISUALIZATION (REACT THREE FIBER / THREE.JS WEBGL) */}
+      {activeSubTab === 'trajectory3d' && (
+        <div className="space-y-5">
+          <AtmosphericControlPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+          <AdvancedThrustCdStabilityPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+          <FlightSimulator3DTrajectory summary={trajectorySummary} params={params} />
+          <SimulationHistoryPanel
+            history={history}
+            onSaveCurrent={handleSaveCurrentSimulation}
+            onLoadParams={(newParams) => setParams(newParams)}
+            onClearHistory={handleClearHistory}
+            onDeleteHistoryItem={handleDeleteHistoryItem}
+            currentApogee={trajectorySummary.maxAltitude}
+            currentMaxVel={trajectorySummary.maxVelocity}
+          />
         </div>
       )}
 
       {/* TAB 2: ROCKET & ATMOSPHERIC PARAMETERS FORM */}
       {activeSubTab === 'params' && (
-        <div className="bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-lg p-5 shadow-xl space-y-5">
+        <div className="space-y-5">
+          {/* Dedicated Realtime Atmospheric Variables & Wind Configuration Panel */}
+          <AtmosphericControlPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+          {/* Dedicated Advanced Controls for Cd, Thrust and Stability */}
+          <AdvancedThrustCdStabilityPanel params={params} setParams={setParams} trajectorySummary={trajectorySummary} />
+
+          <div className="bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-lg p-5 shadow-xl space-y-5">
           <div className="flex items-center justify-between border-b border-slate-800 dark:border-slate-800 light:border-slate-200 pb-3">
             <div>
               <h3 className="text-base font-bold text-slate-100 dark:text-white light:text-slate-900 flex items-center gap-2">
@@ -1094,6 +2113,7 @@ export const FlightSimulator: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import { ManualBarAeb } from './components/ManualBarAeb';
 import { TeamManagement } from './components/TeamManagement';
 import { User3DModelStudio } from './components/User3DModelStudio';
 import { CadRepository } from './components/CadRepository';
+import { SatellitePayloadStudio } from './components/SatellitePayloadStudio';
 import { LegalAndReferences } from './components/LegalAndReferences';
 import { AuthModal } from './components/AuthModal';
 import { InteractiveWalkthrough } from './components/InteractiveWalkthrough';
@@ -59,6 +60,25 @@ export default function App() {
 
           {/* Tab 3: Subsystems & Electronics Assembly Bench */}
           {activeTab === 'subsystems' && <SubsystemsDetail />}
+
+          {/* Tab 4: Satellite & Payload Designer */}
+          {activeTab === 'satellite' && (
+            <SatellitePayloadStudio
+              currentUser={currentUser}
+              onOpenAuthModal={() => setIsAuthOpen(true)}
+              onLoadPayloadToSimulator={(payloadMass) => {
+                try {
+                  const saved = localStorage.getItem('foguetedata_flight_params_v1');
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    parsed.massInitial = Math.round((parsed.massFinal + 0.35 + payloadMass) * 100) / 100;
+                    localStorage.setItem('foguetedata_flight_params_v1', JSON.stringify(parsed));
+                  }
+                } catch {}
+                setActiveTab('trajectory');
+              }}
+            />
+          )}
 
           {/* Tab 4: Manual BAR-AEB & Dedicated Author Space */}
           {activeTab === 'manual_bar_aeb' && (

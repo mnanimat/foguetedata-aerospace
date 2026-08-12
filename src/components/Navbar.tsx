@@ -46,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'trajectory', label: 'Trajetória & Simulação 3D', icon: Rocket },
     { id: 'telemetry', label: 'Telemetria ao Vivo', icon: Activity },
     { id: 'subsystems', label: 'Partes & Eletrônica', icon: Cpu },
+    { id: 'satellite', label: 'Satélites & Carga Útil', icon: Globe, badge: 'CUBESAT' },
     { id: 'manual_bar_aeb', label: 'Manual BAR-AEB', icon: BookOpen, badge: 'COLABORATIVO' },
     { id: 'team', label: 'Gestão de Equipe', icon: Users },
     { id: 'community', label: 'Estúdio 3D Interativo', icon: Box },
