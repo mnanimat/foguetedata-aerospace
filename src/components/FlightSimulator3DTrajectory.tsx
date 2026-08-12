@@ -34,6 +34,8 @@ export const FlightSimulator3DTrajectory: React.FC<FlightSimulator3DTrajectoryPr
   const animParachuteRef = useRef<THREE.Group | null>(null);
   const chMeshRef = useRef<THREE.Mesh | null>(null);
   const chuteOriginalPositionsRef = useRef<Float32Array | null>(null);
+  const chMeshesRef = useRef<THREE.Mesh[]>([]);
+  const chuteOriginalPositionsArrayRef = useRef<Float32Array[]>([]);
   const animThrustRef = useRef<THREE.Points | null>(null);
 
   // Custom 3D Rocket Model Import state
@@ -501,41 +503,153 @@ export const FlightSimulator3DTrajectory: React.FC<FlightSimulator3DTrajectoryPr
     // Rocket Parachute Group (High-Vis Orange / White / Cyan Dome)
     const animParachuteGroup = new THREE.Group();
     const chTexture = create3DChuteTexture();
-    const chGeo = new THREE.SphereGeometry(5, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55);
     
-    // Store original parachute dome vertex array for realistic cloth animation
-    const posAttr = chGeo.attributes.position as THREE.BufferAttribute;
-    const chuteOriginalPositions = new Float32Array(posAttr.array);
-    chuteOriginalPositionsRef.current = chuteOriginalPositions;
+    // Clear previous mesh lists
+    chMeshesRef.current = [];
+    chuteOriginalPositionsArrayRef.current = [];
 
-    const chMat = new THREE.MeshStandardMaterial({
-      map: chTexture,
-      side: THREE.DoubleSide,
-      metalness: 0.2,
-      roughness: 0.3
-    });
-    const chMesh = new THREE.Mesh(chGeo, chMat);
-    chMesh.userData = { name: 'Paraquedas', description: 'Sistema de recuperação aerodinâmico simulado com física de tecidos.' };
-    chMeshRef.current = chMesh;
-    animParachuteGroup.add(chMesh);
+    const numMainParachutes = params.parachuteCount || 1;
+    const numLines = 16;
 
-    // Parachute yellow rim
-    const chRimGeo = new THREE.TorusGeometry(4.95, 0.12, 8, 32);
-    const chRimMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-    const chRimMesh = new THREE.Mesh(chRimGeo, chRimMat);
-    chRimMesh.rotation.x = Math.PI / 2;
-    chRimMesh.position.y = 0.1;
-    animParachuteGroup.add(chRimMesh);
+    // Helper to create a single detailed canopy inside the animation group
+    const buildCanopy = (
+      radius: number,
+      canopyOffset: THREE.Vector3,
+      harnessOffset: THREE.Vector3,
+      rotationZ: number = 0
+    ) => {
+      const subGroup = new THREE.Group();
+      subGroup.position.copy(canopyOffset);
+      subGroup.rotation.z = rotationZ;
 
-    // Parachute shroud lines & central swivel ring
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.9, transparent: true });
-    for (let i = 0; i < 16; i++) {
-      const angle = (i / 16) * Math.PI * 2;
-      const x = Math.cos(angle) * 4.9;
-      const z = Math.sin(angle) * 4.9;
-      const pts = [new THREE.Vector3(x, 0, z), new THREE.Vector3(0, -6.5, 0)];
-      const lineG = new THREE.BufferGeometry().setFromPoints(pts);
-      animParachuteGroup.add(new THREE.Line(lineG, lineMat));
+      // Realistic hemispherical dome with spill hole
+      const canopyGeo = new THREE.SphereGeometry(radius, 40, 24, 0, Math.PI * 2, Math.PI * 0.08, Math.PI * 0.47);
+      
+      const posAttr = canopyGeo.attributes.position as THREE.BufferAttribute;
+      const originalPositions = new Float32Array(posAttr.array);
+      
+      const canopyMat = new THREE.MeshStandardMaterial({
+        map: chTexture,
+        side: THREE.DoubleSide,
+        metalness: 0.25,
+        roughness: 0.35,
+        wireframe: false
+      });
+      const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
+      canopyMesh.userData = { name: 'Paraquedas', description: 'Sistema de recuperação aerodinâmico simulado com física de tecidos.' };
+      
+      subGroup.add(canopyMesh);
+
+      // Keep refs for physics ripple animation
+      chMeshesRef.current.push(canopyMesh);
+      chuteOriginalPositionsArrayRef.current.push(originalPositions);
+
+      // Yellow reinforced hem ring
+      const rimRadius = radius * Math.sin(Math.PI * 0.55);
+      const rimY = radius * Math.cos(Math.PI * 0.55);
+      const hemGeo = new THREE.TorusGeometry(rimRadius, 0.06, 8, 40);
+      const hemMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 });
+      const hemMesh = new THREE.Mesh(hemGeo, hemMat);
+      hemMesh.rotation.x = Math.PI / 2;
+      hemMesh.position.y = rimY;
+      subGroup.add(hemMesh);
+
+      // Black spill hole ring
+      const ventRadius = radius * Math.sin(Math.PI * 0.08);
+      const ventY = radius * Math.cos(Math.PI * 0.08);
+      const ventGeo = new THREE.TorusGeometry(ventRadius, 0.04, 6, 30);
+      const ventMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+      const ventMesh = new THREE.Mesh(ventGeo, ventMat);
+      ventMesh.rotation.x = Math.PI / 2;
+      ventMesh.position.y = ventY;
+      subGroup.add(ventMesh);
+
+      // Shroud Lines (white nylon cords)
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xf8fafc, opacity: 0.9, transparent: true });
+      for (let i = 0; i < numLines; i++) {
+        const angle = (i / numLines) * Math.PI * 2;
+        const topX = Math.cos(angle) * rimRadius;
+        const topZ = Math.sin(angle) * rimRadius;
+        const topY = rimY;
+
+        const pts = [
+          new THREE.Vector3(topX, topY, topZ),
+          harnessOffset
+        ];
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const lineMesh = new THREE.Line(lineGeo, lineMat);
+        subGroup.add(lineMesh);
+      }
+
+      animParachuteGroup.add(subGroup);
+
+      // Return absolute harness point in group coordinates
+      const localHarness = new THREE.Vector3().copy(harnessOffset);
+      localHarness.applyAxisAngle(new THREE.Vector3(0, 0, 1), rotationZ);
+      return new THREE.Vector3().copy(canopyOffset).add(localHarness);
+    };
+
+    // Golden connection swivel ring
+    const swivelGeo = new THREE.TorusGeometry(0.2, 0.05, 8, 24);
+    const swivelMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.2 });
+    const swivelMesh = new THREE.Mesh(swivelGeo, swivelMat);
+    swivelMesh.rotation.x = Math.PI / 2;
+
+    if (numMainParachutes === 1) {
+      // 1 Parachute
+      const harnessOffset = new THREE.Vector3(0, -6.5, 0);
+      const canopyOffset = new THREE.Vector3(0, 0, 0);
+      const harnessPos = buildCanopy(5.0, canopyOffset, harnessOffset, 0);
+
+      swivelMesh.position.copy(harnessPos);
+      animParachuteGroup.add(swivelMesh);
+
+      // Main shock cord going down
+      const shockCordPts = [harnessPos, new THREE.Vector3(0, -13.0, 0)];
+      const cordGeo = new THREE.BufferGeometry().setFromPoints(shockCordPts);
+      const mainCord = new THREE.Line(cordGeo, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 }));
+      animParachuteGroup.add(mainCord);
+
+      // Legacy fallback refs to avoid crashing old lines
+      if (chMeshesRef.current[0]) chMeshRef.current = chMeshesRef.current[0];
+      if (chuteOriginalPositionsArrayRef.current[0]) chuteOriginalPositionsRef.current = chuteOriginalPositionsArrayRef.current[0];
+    } else {
+      // 2 Parachutes (tilted and beautiful!)
+      // Left Parachute
+      const leftHOffset = new THREE.Vector3(0, -5.5, 0);
+      const leftCanopyOffset = new THREE.Vector3(-2.8, 0, 0.7);
+      const leftHarnessPos = buildCanopy(3.8, leftCanopyOffset, leftHOffset, -0.16);
+
+      // Right Parachute
+      const rightHOffset = new THREE.Vector3(0, -5.5, 0);
+      const rightCanopyOffset = new THREE.Vector3(2.8, 0, -0.7);
+      const rightHarnessPos = buildCanopy(3.8, rightCanopyOffset, rightHOffset, 0.16);
+
+      // Swivel point positioned in the center, slightly lower
+      const swivelPos = new THREE.Vector3(0, -7.2, 0);
+      swivelMesh.position.copy(swivelPos);
+      animParachuteGroup.add(swivelMesh);
+
+      // Bridle joining the two harness points to central swivel
+      const bridleMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+      
+      const leftBridleGeo = new THREE.BufferGeometry().setFromPoints([leftHarnessPos, swivelPos]);
+      const leftBridle = new THREE.Line(leftBridleGeo, bridleMat);
+      animParachuteGroup.add(leftBridle);
+
+      const rightBridleGeo = new THREE.BufferGeometry().setFromPoints([rightHarnessPos, swivelPos]);
+      const rightBridle = new THREE.Line(rightBridleGeo, bridleMat);
+      animParachuteGroup.add(rightBridle);
+
+      // Main shock cord going down
+      const shockCordPts = [swivelPos, new THREE.Vector3(0, -13.0, 0)];
+      const cordGeo = new THREE.BufferGeometry().setFromPoints(shockCordPts);
+      const mainCord = new THREE.Line(cordGeo, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 }));
+      animParachuteGroup.add(mainCord);
+
+      // Legacy fallback refs to avoid crashing old lines
+      if (chMeshesRef.current[0]) chMeshRef.current = chMeshesRef.current[0];
+      if (chuteOriginalPositionsArrayRef.current[0]) chuteOriginalPositionsRef.current = chuteOriginalPositionsArrayRef.current[0];
     }
 
     animParachuteGroup.visible = false;
@@ -765,28 +879,31 @@ export const FlightSimulator3DTrajectory: React.FC<FlightSimulator3DTrajectoryPr
             animParachuteRef.current.rotation.set(chuteTiltX, 0, chuteTiltZ);
 
             // REALISTIC FABRIC / CLOTH RIPPLE WAVE SIMULATION
-            if (chMeshRef.current && chuteOriginalPositionsRef.current) {
-              const chGeometry = chMeshRef.current.geometry;
-              const pPositions = chGeometry.attributes.position as THREE.BufferAttribute;
-              const origPositions = chuteOriginalPositionsRef.current;
+            if (chMeshesRef.current.length > 0 && chuteOriginalPositionsArrayRef.current.length > 0) {
               const timeSec = (pt.time || Date.now() * 0.001) * 3.5;
+              chMeshesRef.current.forEach((mesh, index) => {
+                const chGeometry = mesh.geometry;
+                const pPositions = chGeometry.attributes.position as THREE.BufferAttribute;
+                const origPositions = chuteOriginalPositionsArrayRef.current[index];
+                if (!origPositions) return;
 
-              for (let i = 0; i < pPositions.count; i++) {
-                const x0 = origPositions[i * 3];
-                const y0 = origPositions[i * 3 + 1];
-                const z0 = origPositions[i * 3 + 2];
+                for (let i = 0; i < pPositions.count; i++) {
+                  const x0 = origPositions[i * 3];
+                  const y0 = origPositions[i * 3 + 1];
+                  const z0 = origPositions[i * 3 + 2];
 
-                const r = Math.sqrt(x0 * x0 + z0 * z0);
-                const angle = Math.atan2(z0, x0);
+                  const r = Math.sqrt(x0 * x0 + z0 * z0);
+                  const angle = Math.atan2(z0, x0);
 
-                // Nylon Fabric Flutter & Wind Ripple Equation
-                const wave = Math.sin(timeSec * 2.5 + angle * 4.0) * Math.cos(timeSec * 1.8 + y0 * 0.5) * 0.18 * (r / 5.0);
-                const billowScale = 1.0 + wave;
+                  // Nylon Fabric Flutter & Wind Ripple Equation
+                  const wave = Math.sin(timeSec * 2.5 + angle * 4.0) * Math.cos(timeSec * 1.8 + y0 * 0.5) * 0.18 * (r / 5.0);
+                  const billowScale = 1.0 + wave;
 
-                pPositions.setXYZ(i, x0 * billowScale, y0 + Math.sin(timeSec * 3.0 + i) * 0.05, z0 * billowScale);
-              }
-              pPositions.needsUpdate = true;
-              chGeometry.computeVertexNormals();
+                  pPositions.setXYZ(i, x0 * billowScale, y0 + Math.sin(timeSec * 3.0 + i) * 0.05, z0 * billowScale);
+                }
+                pPositions.needsUpdate = true;
+                chGeometry.computeVertexNormals();
+              });
             }
           } else {
             // Touchdown: Parachute gently rests on ground beside rocket

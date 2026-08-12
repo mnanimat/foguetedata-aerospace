@@ -79,6 +79,7 @@ export interface RocketParams {
   mainDeployAlt: number; // m (Altitude to trigger main parachute)
   mainDiameter: number; // m (Main parachute diameter)
   mainCd: number; // Main chute drag coefficient
+  parachuteCount?: number; // Number of main parachutes (1 or 2)
   thrustStartDelay?: number; // s (Delay before engine thrust ignition, default 0s)
   parachuteDeployMode?: 'apogee_auto' | 'delay_after_apogee' | 'fixed_time'; // Parachute ejection timing mode
   parachuteDeployDelay?: number; // s (Delay in seconds for parachute ejection)

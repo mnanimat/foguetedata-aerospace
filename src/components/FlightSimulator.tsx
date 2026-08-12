@@ -374,7 +374,7 @@ const AdvancedThrustCdStabilityPanel: React.FC<AdvancedThrustCdStabilityPanelPro
   const staticMargin = diameterCm > 0 ? deltaXCm / diameterCm : 0;
 
   let stabilityStatus = {
-    label: 'Idealmente Estável (Padrão BAR-AEB)',
+    label: 'Idealmente Estável (Padrão recomendado)',
     badgeClass: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
     colorHex: '#10b981',
     description: 'A margem estática está na faixa ideal (1.0 a 2.5 calibres). O minifoguete manterá estabilidade passiva sem caturro ou giros indesejados.'
@@ -484,7 +484,7 @@ const AdvancedThrustCdStabilityPanel: React.FC<AdvancedThrustCdStabilityPanelPro
                         : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    🎯 Padrão BAR-AEB (0.42)
+                    🎯 Padrão recomendado (0.42)
                   </button>
                   <button
                     onClick={() => setParams({ ...params, cd: 0.52 })}
@@ -709,7 +709,7 @@ const AdvancedThrustCdStabilityPanel: React.FC<AdvancedThrustCdStabilityPanelPro
                 </div>
 
                 <div className="flex justify-between text-[10px] text-slate-400 pt-1">
-                  <span>Ideal BAR-AEB: 1.0 - 2.5 cal</span>
+                  <span>Ideal: 1.0 - 2.5 cal</span>
                   <span className="font-bold text-slate-200">Margem Atual: {staticMargin.toFixed(2)} cal</span>
                 </div>
               </div>
@@ -950,7 +950,8 @@ const DEFAULT_FLIGHT_PARAMS: RocketParams = {
   drogueCd: 1.5, // drogue chute drag coefficient
   mainDeployAlt: 150, // m main deployment altitude
   mainDiameter: 1.15, // m main chute diameter
-  mainCd: 2.2 // main chute drag coefficient
+  mainCd: 2.2, // main chute drag coefficient
+  parachuteCount: 1 // Number of parachutes (1 or 2)
 };
 
 export const FlightSimulator: React.FC = () => {
@@ -2142,6 +2143,38 @@ export const FlightSimulator: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-slate-300 dark:text-slate-300 light:text-slate-700 mb-1 font-semibold text-xs text-slate-400 font-mono uppercase">
+                  Qtd. de Paraquedas Principais (Recuperação)
+                </label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setParams({ ...params, parachuteCount: 1 })}
+                    className={`p-2 rounded font-mono font-bold text-xs border transition flex items-center justify-center gap-1.5 ${
+                      (params.parachuteCount || 1) === 1
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>🪂</span>
+                    <span>1 Paraquedas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParams({ ...params, parachuteCount: 2 })}
+                    className={`p-2 rounded font-mono font-bold text-xs border transition flex items-center justify-center gap-1.5 ${
+                      params.parachuteCount === 2
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>🪂🪂</span>
+                    <span>2 Paraquedas</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-slate-300 dark:text-slate-300 light:text-slate-700 mb-1">
                   Velocidade do Vento de Solo (km/h)
                 </label>
@@ -2219,7 +2252,7 @@ export const FlightSimulator: React.FC = () => {
               <div className="bg-[#111827] dark:bg-[#111827] light:bg-white p-3 rounded text-slate-200 dark:text-slate-200 light:text-slate-900 border border-slate-800 dark:border-slate-800 light:border-slate-200 overflow-x-auto text-[11px] leading-relaxed">
                 <div>Margem Estática SM = (CP - CG) / d_calibre</div>
                 <div>CP_foguete = (C_N,coifa · X_n + C_N,aleta · X_f) / (C_N,coifa + C_N,aleta)</div>
-                <div>1.0 ≤ SM ≤ 2.5 calibres (Recomendação BAR-AEB)</div>
+                <div>1.0 ≤ SM ≤ 2.5 calibres (Padrão recomendado)</div>
               </div>
               <p className="text-[10px] text-slate-400 dark:text-slate-400 light:text-slate-600 font-sans">
                 Margem atual do projeto: <strong className="text-amber-400">{trajectorySummary.staticMarginInitial} calibres</strong>.

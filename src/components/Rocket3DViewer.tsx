@@ -677,42 +677,140 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
     chuteGroup.position.set(0, 9.2, 0);
     chuteGroupRef.current = chuteGroup;
 
-    const chuteTexture = createHighVisParachuteTexture();
-    const canopyGeo = new THREE.SphereGeometry(2.8, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    const canopyMat = new THREE.MeshStandardMaterial({
-      map: chuteTexture,
-      side: THREE.DoubleSide,
-      roughness: 0.2,
-      metalness: 0.3,
-      wireframe: wireframe
-    });
-    const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
-    chuteGroup.add(canopyMesh);
-
-    // Yellow Canopy Rim Ring
-    const ribGeo = new THREE.TorusGeometry(2.78, 0.05, 8, 32);
-    const ribMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-    const ribMesh = new THREE.Mesh(ribGeo, ribMat);
-    ribMesh.rotation.x = Math.PI / 2;
-    ribMesh.position.y = 0.05;
-    chuteGroup.add(ribMesh);
-
-    // Shroud Lines
+    const pCount = rocketParams?.parachuteCount || 1;
     const numLines = currentChuteConfig.shroudLinesCount || 16;
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
-    for (let i = 0; i < numLines; i++) {
-      const angle = (i / numLines) * Math.PI * 2;
-      const radius = 2.75;
-      const topX = Math.cos(angle) * radius;
-      const topZ = Math.sin(angle) * radius;
+    const chuteTexture = createHighVisParachuteTexture();
 
-      const linePoints = [
-        new THREE.Vector3(topX, 0, topZ),
-        new THREE.Vector3(0, -3.6, 0)
+    // Helper to create a single canopy with pristine, realistic geometry, gold reinforced hem and dark spill hole
+    const createDetailedCanopy = (
+      radius: number,
+      shroudLinesCount: number,
+      harnessOffset: THREE.Vector3, // relative to canopy center
+      canopyOffset: THREE.Vector3, // relative to chuteGroup root
+      rotationZ: number = 0
+    ) => {
+      const singleChuteGroup = new THREE.Group();
+      singleChuteGroup.position.copy(canopyOffset);
+      singleChuteGroup.rotation.z = rotationZ;
+
+      // Canopy: beautiful inflated hemispherical dome with spill hole (vent) at the top
+      // Theta start at 0.08*PI to construct a beautiful spill hole at the apex
+      const canopyGeo = new THREE.SphereGeometry(radius, 40, 24, 0, Math.PI * 2, Math.PI * 0.08, Math.PI * 0.47);
+      const canopyMat = new THREE.MeshStandardMaterial({
+        map: chuteTexture,
+        side: THREE.DoubleSide,
+        roughness: 0.35,
+        metalness: 0.15,
+        wireframe: wireframe
+      });
+      const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
+      singleChuteGroup.add(canopyMesh);
+
+      // Yellow reinforced hem webbing tape (lower rim)
+      const rimRadius = radius * Math.sin(Math.PI * 0.55);
+      const rimY = radius * Math.cos(Math.PI * 0.55);
+      const hemGeo = new THREE.TorusGeometry(rimRadius, 0.035, 8, 40);
+      const hemMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 });
+      const hemMesh = new THREE.Mesh(hemGeo, hemMat);
+      hemMesh.rotation.x = Math.PI / 2;
+      hemMesh.position.y = rimY;
+      singleChuteGroup.add(hemMesh);
+
+      // Spill Hole / Vent black reinforcement ring
+      const ventRadius = radius * Math.sin(Math.PI * 0.08);
+      const ventY = radius * Math.cos(Math.PI * 0.08);
+      const ventGeo = new THREE.TorusGeometry(ventRadius, 0.025, 6, 30);
+      const ventMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+      const ventMesh = new THREE.Mesh(ventGeo, ventMat);
+      ventMesh.rotation.x = Math.PI / 2;
+      ventMesh.position.y = ventY;
+      singleChuteGroup.add(ventMesh);
+
+      // Shroud lines (White high-fidelity nylon cords)
+      const lineMaterial = new THREE.LineBasicMaterial({ color: 0xf1f5f9, transparent: true, opacity: 0.85 });
+      for (let i = 0; i < shroudLinesCount; i++) {
+        const angle = (i / shroudLinesCount) * Math.PI * 2;
+        const topX = Math.cos(angle) * rimRadius;
+        const topZ = Math.sin(angle) * rimRadius;
+        const topY = rimY;
+
+        const linePoints = [
+          new THREE.Vector3(topX, topY, topZ),
+          harnessOffset
+        ];
+        const linePointsGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+        const lineMesh = new THREE.Line(linePointsGeo, lineMaterial);
+        singleChuteGroup.add(lineMesh);
+      }
+
+      chuteGroup.add(singleChuteGroup);
+
+      // Calculate and return harness position in parent space (chuteGroup)
+      const localHarness = new THREE.Vector3().copy(harnessOffset);
+      localHarness.applyAxisAngle(new THREE.Vector3(0, 0, 1), rotationZ);
+      return new THREE.Vector3().copy(canopyOffset).add(localHarness);
+    };
+
+    // Golden connection swivel ring where shroud lines or branch cords connect
+    const swivelGeo = new THREE.TorusGeometry(0.12, 0.03, 8, 24);
+    const swivelMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.2 });
+    const swivelMesh = new THREE.Mesh(swivelGeo, swivelMat);
+    swivelMesh.rotation.x = Math.PI / 2;
+
+    if (pCount === 1) {
+      // 1 Parachute Configuration
+      const hOffset = new THREE.Vector3(0, -3.8, 0);
+      const canopyCenter = new THREE.Vector3(0, 0, 0);
+      const harnessPos = createDetailedCanopy(2.8, numLines, hOffset, canopyCenter, 0);
+
+      swivelMesh.position.copy(harnessPos);
+      chuteGroup.add(swivelMesh);
+
+      // Thick red main shock cord going from swivel down to recovery bay
+      const shockCordPoints = [
+        harnessPos,
+        new THREE.Vector3(0, -7.8, 0) // World height y = 1.4 (9.2 - 7.8)
       ];
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
-      const lineMesh = new THREE.Line(lineGeo, lineMaterial);
-      chuteGroup.add(lineMesh);
+      const cordGeo = new THREE.BufferGeometry().setFromPoints(shockCordPoints);
+      const mainShockCord = new THREE.Line(cordGeo, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 }));
+      chuteGroup.add(mainShockCord);
+
+    } else {
+      // 2 Parachutes Configuration (beautifully tilted side-by-side, matching the image perfectly!)
+      // Left Parachute
+      const leftHOffset = new THREE.Vector3(0, -3.2, 0);
+      const leftCanopyCenter = new THREE.Vector3(-1.6, 0, 0.4);
+      const leftHarnessPos = createDetailedCanopy(2.1, numLines, leftHOffset, leftCanopyCenter, -0.16);
+
+      // Right Parachute
+      const rightHOffset = new THREE.Vector3(0, -3.2, 0);
+      const rightCanopyCenter = new THREE.Vector3(1.6, 0, -0.4);
+      const rightHarnessPos = createDetailedCanopy(2.1, numLines, rightHOffset, rightCanopyCenter, 0.16);
+
+      // Swivel node positioned in the center, slightly lower
+      const swivelPos = new THREE.Vector3(0, -4.2, 0);
+      swivelMesh.position.copy(swivelPos);
+      chuteGroup.add(swivelMesh);
+
+      // Sky blue branch cords (bridle) joining each harness to the central swivel
+      const bridleMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+      
+      const leftBridleGeo = new THREE.BufferGeometry().setFromPoints([leftHarnessPos, swivelPos]);
+      const leftBridle = new THREE.Line(leftBridleGeo, bridleMat);
+      chuteGroup.add(leftBridle);
+
+      const rightBridleGeo = new THREE.BufferGeometry().setFromPoints([rightHarnessPos, swivelPos]);
+      const rightBridle = new THREE.Line(rightBridleGeo, bridleMat);
+      chuteGroup.add(rightBridle);
+
+      // Thick red main shock cord going from swivel down to recovery bay
+      const shockCordPoints = [
+        swivelPos,
+        new THREE.Vector3(0, -7.8, 0) // World height y = 1.4 (9.2 - 7.8)
+      ];
+      const cordGeo = new THREE.BufferGeometry().setFromPoints(shockCordPoints);
+      const mainShockCord = new THREE.Line(cordGeo, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 }));
+      chuteGroup.add(mainShockCord);
     }
 
     rocketGroup.add(chuteGroup);
@@ -771,7 +869,32 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
         if (showParachuteRef.current) {
           noseConeMeshRef.current.position.lerp(new THREE.Vector3(-2.8, 2.2 * bodyScaleY + expl * 3, 0.5), 0.1);
           noseConeMeshRef.current.rotation.z = 0.8;
-          if (shockCordLineRef.current) shockCordLineRef.current.visible = true;
+          if (shockCordLineRef.current) {
+            shockCordLineRef.current.visible = true;
+            if (recoveryMeshRef.current && defaultTubeGroupRef.current) {
+              const bodyPos = new THREE.Vector3();
+              recoveryMeshRef.current.getWorldPosition(bodyPos);
+              
+              const nosePos = new THREE.Vector3();
+              noseConeMeshRef.current.getWorldPosition(nosePos);
+
+              const localBody = defaultTubeGroupRef.current.worldToLocal(bodyPos.clone());
+              const localNose = defaultTubeGroupRef.current.worldToLocal(nosePos.clone());
+
+              const points = [localBody];
+
+              if (chuteGroupRef.current && chuteGroupRef.current.visible) {
+                const swivelLocal = new THREE.Vector3(0, pCount === 1 ? -3.8 : -4.2, 0);
+                swivelLocal.applyMatrix4(chuteGroupRef.current.matrixWorld);
+                const localSwivel = defaultTubeGroupRef.current.worldToLocal(swivelLocal);
+                points.push(localSwivel);
+              }
+
+              points.push(localNose);
+              shockCordLineRef.current.geometry.setFromPoints(points);
+              shockCordLineRef.current.geometry.attributes.position.needsUpdate = true;
+            }
+          }
         } else {
           noseConeMeshRef.current.position.lerp(new THREE.Vector3(0, 3.6 * bodyScaleY + expl * 4.5, 0), 0.15);
           noseConeMeshRef.current.rotation.set(0, 0, 0);
@@ -845,7 +968,7 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
     };
-  }, [wireframe]);
+  }, [wireframe, rocketParams, currentChuteConfig]);
 
   // Handle 3D File Upload (OBJ, FBX, GLTF, GLB, STL)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1262,7 +1385,7 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
 
               <div className="p-3 bg-amber-950/30 rounded-lg border border-amber-500/30 text-amber-200 space-y-1">
                 <span className="font-bold flex items-center gap-1.5 text-amber-400">
-                  <ShieldCheck className="w-4 h-4" /> Diretriz do Manual BAR-AEB para Pré-Lançamento:
+                  <ShieldCheck className="w-4 h-4" /> Diretriz recomendada para Pré-Lançamento:
                 </span>
                 <p className="text-[11px] leading-relaxed text-amber-200/90">{currentAnatomyPart.barAebGuide}</p>
               </div>

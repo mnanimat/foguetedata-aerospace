@@ -394,7 +394,7 @@ export const SubsystemsDetail: React.FC = () => {
                 onClick={() => setConnectedModules({ esp32: true, bmp280: true, mpu6050: true, lora: true, mosfet: true, gps: true, battery: true })}
                 className="text-[10px] text-cyan-400 hover:text-cyan-300 underline"
               >
-                Restaurar Padrão BAR-AEB
+                Restaurar Padrão recomendado
               </button>
             </div>
 

@@ -232,7 +232,8 @@ export function calculatePreciseTrajectory(params: RocketParams): TrajectorySumm
     } else if (phase === 'drogue') {
       dragForce = 0.5 * rho * areaDrogue * params.drogueCd * vRel * vRel;
     } else if (phase === 'main_chute') {
-      dragForce = 0.5 * rho * areaMain * params.mainCd * vRel * vRel;
+      const count = params.parachuteCount || 1;
+      dragForce = count * 0.5 * rho * areaMain * params.mainCd * vRel * vRel;
     }
 
     // Force Components
