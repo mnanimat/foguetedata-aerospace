@@ -983,6 +983,8 @@ export const FlightSimulator: React.FC = () => {
   const [playbackTime, setPlaybackTime] = useState(0);
   const [showAdvancedFormulas, setShowAdvancedFormulas] = useState(true);
   const [isTrajectoryExpanded, setIsTrajectoryExpanded] = useState(false);
+  const [is3DExpanded, setIs3DExpanded] = useState(false);
+  const [rocket3DColSpan, setRocket3DColSpan] = useState<1 | 2 | 3>(1);
   const [show3DTrajectoryTab, setShow3DTrajectoryTab] = useState(false);
 
   // History State for storing the last 5 simulations
@@ -1552,15 +1554,60 @@ export const FlightSimulator: React.FC = () => {
           {/* Interactive Trajectory Simulation & 3D Rocket Panel */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* 3D Realtime Rocket Model */}
-            <div className="lg:col-span-1 space-y-3">
-              <div className="flex items-center justify-between bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 p-3 rounded-lg">
+            <div className={`space-y-3 ${
+              rocket3DColSpan === 1 
+                ? 'lg:col-span-1' 
+                : rocket3DColSpan === 2 
+                ? 'lg:col-span-2' 
+                : 'lg:col-span-3'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 p-3 rounded-lg">
                 <span className="text-xs font-bold text-slate-200 dark:text-slate-200 light:text-slate-800 font-mono flex items-center gap-2">
                   <Layers className="w-4 h-4 text-blue-400" />
                   Modelo 3D Foguete & Malha CAD
                 </span>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 dark:bg-emerald-950/50 light:bg-emerald-100 border border-emerald-800/50 light:border-emerald-300 px-2 py-0.5 rounded">
-                  BAR-AEB Calibre {params.diameter * 1000}mm
-                </span>
+                
+                <div className="flex items-center gap-1.5">
+                  {/* Grid Layout Switcher */}
+                  <div className="flex items-center gap-1 bg-[#05070A] p-1 rounded border border-slate-800">
+                    <button
+                      onClick={() => setRocket3DColSpan(1)}
+                      className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition ${
+                        rocket3DColSpan === 1 ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Exibição Padrão (3D Estreito)"
+                    >
+                      1/3
+                    </button>
+                    <button
+                      onClick={() => setRocket3DColSpan(2)}
+                      className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition ${
+                        rocket3DColSpan === 2 ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Exibição Ampla (3D Expandido)"
+                    >
+                      2/3
+                    </button>
+                    <button
+                      onClick={() => setRocket3DColSpan(3)}
+                      className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded transition ${
+                        rocket3DColSpan === 3 ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Exibição Empilhada (Foco 3D Máximo)"
+                    >
+                      3/3
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setIs3DExpanded(true)}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 transition shadow"
+                    title="Visualizar em Tela Cheia"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                    <span>Expandir</span>
+                  </button>
+                </div>
               </div>
               <Rocket3DViewer 
                 autoDeployParachute={currentPoint ? (currentPoint.time > trajectorySummary.timeToApogee) : false} 
@@ -1569,7 +1616,13 @@ export const FlightSimulator: React.FC = () => {
             </div>
 
             {/* Trajectory Flight Profile Chart Visualizer */}
-            <div className="lg:col-span-2 bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-lg p-4 shadow-xl space-y-4">
+            <div className={`bg-[#111827] dark:bg-[#111827] light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-lg p-4 shadow-xl space-y-4 ${
+              rocket3DColSpan === 1 
+                ? 'lg:col-span-2' 
+                : rocket3DColSpan === 2 
+                ? 'lg:col-span-1' 
+                : 'lg:col-span-3'
+            }`}>
               <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-100 dark:text-white light:text-slate-900 flex items-center gap-2">
@@ -2432,6 +2485,50 @@ export const FlightSimulator: React.FC = () => {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Expanded 3D Rocket Model Fullscreen Modal */}
+      {is3DExpanded && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 font-mono text-xs">
+          <div className="bg-[#05070A] border border-cyan-500/50 rounded-2xl max-w-5xl w-full h-[92vh] flex flex-col shadow-2xl overflow-hidden relative text-slate-100">
+            
+            {/* Modal Header */}
+            <div className="bg-[#111827] border-b border-slate-800 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-cyan-600/20 border border-cyan-500/50 text-cyan-400">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Visualizador 3D do Foguete (Modo Expandido)
+                    <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-500/40 px-2 py-0.5 rounded font-mono uppercase">
+                      Interação Direta & CAD
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-sans">
+                    Inspeção anatômica de sub-sistemas, controle de paraquedas e importação de modelos customizados.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIs3DExpanded(false)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                title="Fechar Visualização Expandida"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <Rocket3DViewer 
+                autoDeployParachute={currentPoint ? (currentPoint.time > trajectorySummary.timeToApogee) : false} 
+                rocketParams={params}
+              />
+            </div>
           </div>
         </div>
       )}
