@@ -139,6 +139,20 @@ const ROCKET_ANATOMY_PARTS: RocketAnatomyPart[] = [
   }
 ];
 
+// Helper to map subsystem IDs to Lucide icons
+const getPartIcon = (id: string, className = "w-4 h-4") => {
+  switch (id) {
+    case 'nose': return <Compass className={className} />;
+    case 'payload': return <Box className={className} />;
+    case 'recovery': return <ShieldCheck className={className} />;
+    case 'avionics': return <Cpu className={className} />;
+    case 'body': return <Layers className={className} />;
+    case 'motor': return <Flame className={className} />;
+    case 'fins': return <Zap className={className} />;
+    default: return <Activity className={className} />;
+  }
+};
+
 export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
   selectedSubsystem,
   onSelectSubsystem,
@@ -1168,24 +1182,38 @@ export const Rocket3DViewer: React.FC<Rocket3DViewerProps> = ({
               return (
                 <button
                   key={part.id}
+                  id={`btn-subsystem-${part.id}`}
                   onClick={() => {
                     setActiveAnatomyId(part.id);
                     if (onSelectSubsystem) onSelectSubsystem(part.id);
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-1.5 ${
+                  className={`p-2 md:p-2.5 rounded-xl border transition cursor-pointer flex flex-col items-center md:items-start md:text-left gap-1.5 min-w-0 ${
                     isActive
                       ? 'bg-gradient-to-b from-cyan-900/40 to-purple-900/40 border-cyan-400 shadow-lg ring-1 ring-cyan-400/50'
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300'
                   }`}
+                  title={part.name}
                 >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: part.colorHex }}
-                    />
-                    <span className="text-[9px] font-mono text-slate-400 uppercase">{part.category}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5 justify-center md:justify-start w-full md:w-auto">
+                      <span
+                        className="w-2 h-2 rounded-full hidden md:inline-block"
+                        style={{ backgroundColor: part.colorHex }}
+                      />
+                      <div className="text-cyan-400">
+                        {getPartIcon(part.id, "w-4 h-4")}
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-400 uppercase hidden lg:inline">{part.category}</span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-white line-clamp-1">{part.shortLabel}</span>
+                  {/* Full label on larger screens */}
+                  <span className="text-[10px] md:text-xs font-mono font-bold text-white line-clamp-1 hidden sm:block">
+                    {part.shortLabel}
+                  </span>
+                  {/* Single word on mobile to guarantee layout doesn't overflow */}
+                  <span className="text-[9px] font-mono font-bold text-white line-clamp-1 block sm:hidden">
+                    {part.shortLabel.split(' ')[0]}
+                  </span>
                 </button>
               );
             })}
