@@ -15,7 +15,8 @@ import {
   Sparkles,
   Layers,
   Sun,
-  Moon
+  Moon,
+  Cloud
 } from 'lucide-react';
 import { ActiveTab, User } from '../types';
 import { EXTERNAL_LINKS } from '../data/knowledgeData';
@@ -47,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'telemetry', label: 'Telemetria ao Vivo', icon: Activity },
     { id: 'subsystems', label: 'Partes & Eletrônica', icon: Cpu },
     { id: 'satellite', label: 'Satélites & Carga Útil', icon: Globe, badge: 'CUBESAT' },
+    { id: 'hub_aeroespacial', label: 'Hub, Fórum & Equipes', icon: Cloud, badge: 'CLOUDFLARE' },
     { id: 'manual_bar_aeb', label: 'Manual BAR-AEB', icon: BookOpen, badge: 'COLABORATIVO' },
     { id: 'team', label: 'Gestão de Equipe', icon: Users },
     { id: 'community', label: 'Estúdio 3D Interativo', icon: Box },

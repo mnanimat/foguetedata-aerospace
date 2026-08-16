@@ -9,6 +9,7 @@ export type ActiveTab =
   | 'community'
   | 'cad_repository'
   | 'satellite'
+  | 'hub_aeroespacial'
   | 'legal';
 
 export interface SatellitePayloadConfig {

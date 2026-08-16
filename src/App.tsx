@@ -10,6 +10,7 @@ import { TeamManagement } from './components/TeamManagement';
 import { User3DModelStudio } from './components/User3DModelStudio';
 import { CadRepository } from './components/CadRepository';
 import { SatellitePayloadStudio } from './components/SatellitePayloadStudio';
+import { AerospaceHubCloudflare } from './components/AerospaceHubCloudflare';
 import { LegalAndReferences } from './components/LegalAndReferences';
 import { AuthModal } from './components/AuthModal';
 import { InteractiveWalkthrough } from './components/InteractiveWalkthrough';
@@ -79,6 +80,9 @@ export default function App() {
               }}
             />
           )}
+
+          {/* Tab: Hub Aeroespacial & Comunidade Cloudflare Pages */}
+          {activeTab === 'hub_aeroespacial' && <AerospaceHubCloudflare />}
 
           {/* Tab 4: Manual BAR-AEB & Dedicated Author Space */}
           {activeTab === 'manual_bar_aeb' && (
